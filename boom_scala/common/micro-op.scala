@@ -15,7 +15,7 @@ import chisel3._
 import chisel3.util._
 
 import freechips.rocketchip.config.Parameters
-
+import boom.ifu.BranchPredictionPerf
 import boom.exu.FUConstants
 
 /**
@@ -147,6 +147,7 @@ class MicroOp(implicit p: Parameters) extends BoomBundle
   // What prediction structure provides the prediction TO this op
   val debug_tsrc       = UInt(BSRC_SZ.W)
 
+  val bpd_perf         = new BranchPredictionPerf
   // Do we allocate a branch tag for this?
   // SFB branches don't get a mask, they get a predicate bit
   def allocate_brtag   = (is_br && !is_sfb) || is_jalr
