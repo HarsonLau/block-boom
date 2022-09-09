@@ -1,0 +1,7 @@
+mcs/
+mcs_build_log/
+sims/
+build_log/
+*.zip
+#ignore all files with postfix log
+*.log
