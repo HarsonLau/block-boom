@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+
+
 import matplotlib as mpl
 import numpy as np
 import matplotlib.pyplot as plt
@@ -231,68 +234,75 @@ def draw_lines(xvalue, lnames, rnames, xlabel, ylabel1, ylabel2):
 def drawplot(resname):
     figs = []
     xvalue = datas['stage'].value
-    xlabel = "Running Stage (200M Instructions)"
+    xlabel = "Running Stage (20M Instructions)"
     # frontend
-    leftnames = ['icache_miss_rate', 'itlb_miss_rate']
-    figs.append(draw_lines(xvalue, leftnames, ['user_ipc'], xlabel, "ICache & ITLB Miss Rate", "User IPC"))
+    # leftnames = ['icache_miss_rate', 'itlb_miss_rate']
+    # figs.append(draw_lines(xvalue, leftnames, ['user_ipc'], xlabel, "ICache & ITLB Miss Rate", "User IPC"))
 
-    leftnames = ['icache_to_l2_rate', 'itlb_to_ptw_rate']
-    figs.append(draw_lines(xvalue, leftnames, ['user_ipc'], xlabel, "ICache & ITLB Miss Rate", "User IPC"))
+    # leftnames = ['icache_to_l2_rate', 'itlb_to_ptw_rate']
+    # figs.append(draw_lines(xvalue, leftnames, ['user_ipc'], xlabel, "ICache & ITLB Miss Rate", "User IPC"))
     
-    leftnames = ['fb_out_zero_perc', 'fb_out_notFull_perc', 'fb_out_full_perc']
-    figs.append(draw_pecetage(xvalue, leftnames, ['user_ipc'], xlabel, "Fetch Buffer Output Rate", "User IPC"))
+    # leftnames = ['fb_out_zero_perc', 'fb_out_notFull_perc', 'fb_out_full_perc']
+    # figs.append(draw_pecetage(xvalue, leftnames, ['user_ipc'], xlabel, "Fetch Buffer Output Rate", "User IPC"))
 
-    leftnames = ['fb_out_full_perc', 'fb_out_notFull_perc', 'fb_out_zero_perc']
-    rightnames = ['npc_from_f1_perc', 'npc_from_f3_perc']
-    figs.append(draw_pecetage(xvalue, leftnames, rightnames, xlabel, "Fetch Buffer Output Rate", "NPC Source"))
+    # leftnames = ['fb_out_full_perc', 'fb_out_notFull_perc', 'fb_out_zero_perc']
+    # rightnames = ['npc_from_f1_perc', 'npc_from_f3_perc']
+    # figs.append(draw_pecetage(xvalue, leftnames, rightnames, xlabel, "Fetch Buffer Output Rate", "NPC Source"))
 
-    leftnames = ['fb_out_zero_perc', 'fb_out_notFull_perc', 'fb_out_full_perc']
-    figs.append(draw_pecetage(xvalue, leftnames, ['icache_miss_rate', 'itlb_miss_rate'], xlabel, "Fetch Buffer Output Rate", "ICache & ITLB Miss Rate"))
+    # leftnames = ['fb_out_zero_perc', 'fb_out_notFull_perc', 'fb_out_full_perc']
+    # figs.append(draw_pecetage(xvalue, leftnames, ['icache_miss_rate', 'itlb_miss_rate'], xlabel, "Fetch Buffer Output Rate", "ICache & ITLB Miss Rate"))
 
     # # branch
-    leftnames = ['exe_misp_MPKI']
-    figs.append(draw_lines(xvalue, leftnames, ['user_ipc'], xlabel, "MPKI", "User IPC"))
+    #print(sys.argv[1])
+    # enumerate the rows of sys.argv[1] and put the first column of each row into a list if they contain'br_tage_hit'
+    rightnames=[row[0] for row in csv.reader(open(sys.argv[1])) if 'user_ipc' in row[0]]
+    # enumerate the rightnames , split each right name by '_' and put the first column of each row into a list
+    configs=[rightname.split('_')[0] for rightname in rightnames]
+    leftnames = [row[0] for row in csv.reader(open(sys.argv[1])) if 'tage_br_hit_rate' in row[0]]
+    #leftnames =['6-128-9_tage_br_hit_rate','6-2048-9_tage_br_hit_rate']
+    figs.append(draw_lines(xvalue, leftnames, rightnames, xlabel, "tage br hit rate", "User IPC"))
+    for config in configs:
+        single_right=[rightname for rightname in rightnames if config in rightname]
+        single_left=[leftname for leftname in leftnames if config in leftname]
+        if len(configs) >1:
+            figs.append(draw_lines(xvalue, single_left, single_right, xlabel, "tage br hit rate", "User IPC"))
+        figs.append(draw_lines(xvalue, single_left,[], xlabel, "tage br hit rate", ""))
+        figs.append(draw_lines(xvalue,  single_right,[], xlabel,  "User IPC",""))
+    
+    leftnames = [row[0] for row in csv.reader(open(sys.argv[1])) if 'tage_br_misp/hit' in row[0]]
+    #leftnames=['base_tage_br_misp/hit','128_tage_br_misp/hit','256_tage_br_misp/hit','2048_tage_br_misp/hit']
+    figs.append(draw_lines(xvalue, leftnames, rightnames, xlabel, "tage br misprediction/hit rate", "User IPC"))
+    for config in configs:
+        single_right=[rightname for rightname in rightnames if config in rightname]
+        single_left=[leftname for leftname in leftnames if config in leftname]
+        if len(configs) >1:
+            figs.append(draw_lines(xvalue, single_left, single_right, xlabel, "tage br misprediction/hit rate", "User IPC"))
+        figs.append(draw_lines(xvalue, single_left,[], xlabel, "tage br misprediction/hit rate", ""))
+    
 
-    leftnames = ['exe_misp_br_perc', 'exe_misp_ret_perc', 'exe_misp_jalrcall_perc', 'exe_misp_jalr_else_perc']
-    figs.append(draw_pecetage(xvalue, leftnames, ['exe_misp_MPKI'], xlabel, "Executed Branch Percetage", "MPKI"))
+    leftnames=[row[0] for row in csv.reader(open(sys.argv[1])) if 'tage_br_misp_rate' in row[0]]
+    #leftnames = ['base_tage_br_misp_rate','128_tage_br_misp_rate','256_tage_br_misp_rate','2048_tage_br_misp_rate']
+    figs.append(draw_lines(xvalue, leftnames, rightnames, xlabel, "tage br misprediction rate", "User IPC"))
+    for config in configs:
+        single_right=[rightname for rightname in rightnames if config in rightname]
+        single_left=[leftname for leftname in leftnames if config in leftname]
+        if len(configs) >1:
+            figs.append(draw_lines(xvalue, single_left, single_right, xlabel, "tage br misprediction rate", "User IPC"))
+        figs.append(draw_lines(xvalue, single_left,[], xlabel, "tage br misprediction rate", ""))
 
-    leftnames = ['npc_from_f1_perc', 'npc_from_f2_perc', 'npc_from_f3_perc', 'npc_from_core_perc']
-    figs.append(draw_pecetage(xvalue, leftnames, ['exe_misp_MPKI'], xlabel, "NPC Source", "MPKI"))
-
-    leftnames = ['fb_out_zero_perc', 'fb_out_notFull_perc', 'fb_out_full_perc']
-    figs.append(draw_pecetage(xvalue, leftnames, ['exe_misp_MPKI'], xlabel, "Fetch Buffer Output Rate", "MPKI"))
-
-    leftnames = ['iss_val_zero_perc', 'iss_val_notFull_perc', 'iss_val_full_perc']
-    figs.append(draw_pecetage(xvalue, leftnames, ['exe_misp_MPKI'], xlabel, "Issue Uops Rate", "MPKI"))
-
-    leftnames = ['icache_miss_rate', 'itlb_miss_rate', 'dcache_nack_rate', 'dtlb_miss_rate']
-    figs.append(draw_lines(xvalue, leftnames, ['exe_misp_MPKI'], xlabel, "Cache & TLB Miss Rate", "MPKI"))
-
-    #DCache & DTLB
-    leftnames = ['dcache_nack_rate', 'dtlb_miss_rate']
-    figs.append(draw_lines(xvalue, leftnames, ['user_ipc'], xlabel, "DCache & DTLB Miss Rate", "User IPC"))
-
-    leftnames = ['dcache_to_l2_rate', 'dtlb_to_ptw_rate']
-    figs.append(draw_lines(xvalue, leftnames, ['user_ipc'], xlabel, "DCache & DTLB Miss Rate", "User IPC"))
-
-    leftnames = ['exe_is_ld_perc', 'exe_is_st_perc']
-    rightnames = ['dcache_nack_rate', 'dtlb_miss_rate', 'misspec_issuop_rate']
-    figs.append(draw_pecetage(xvalue, leftnames, rightnames, xlabel, "Executed Load & Store Percetage", "DCache & DTLB Miss Rate"))
-
-    leftnames = ['iss_val_zero_perc', 'iss_val_notFull_perc', 'iss_val_full_perc']
-    figs.append(draw_pecetage(xvalue, leftnames, rightnames, xlabel, "Issue Uops Rate", "DCache & DTLB Miss Rate"))
-
-    # Else 
-    leftnames = ['npc_from_f1_perc', 'fb_out_full_perc', 'dec_out_full_perc', 'dis_out_full_perc', 'iss_val_full_perc']
-    figs.append(draw_lines(xvalue, leftnames, ['exe_misp_MPKI'], xlabel, "Pipeline Info", "MPKI"))
-
-    leftnames = ['com_excpt_rate', 'rollback_cycles_rate']
-    figs.append(draw_lines(xvalue, leftnames, ['user_ipc'], xlabel, "Commit Exception Rate", "User IPC"))
-
-    leftnames = ['mini_exception_perc', 'misalign_excpt_perc', 'lstd_pagefault_perc', 'fetch_pagefault_perc']
-    figs.append(draw_pecetage(xvalue, leftnames, ['user_ipc'], xlabel, "Exception Reasons", "User IPC"))
-
-
+    leftnames=[row[0] for row in csv.reader(open(sys.argv[1])) if "exe_misp_MPKI"in row[0]]
+    figs.append(draw_lines(xvalue, leftnames, rightnames, xlabel, "exe_misp_MPKI", "User IPC"))
+    for config in configs:
+        single_right=[rightname for rightname in rightnames if config in rightname]
+        single_left=[leftname for leftname in leftnames if config in leftname]
+        if len(configs) >1:
+            figs.append(draw_lines(xvalue, single_left, single_right, xlabel, "exe_misp_MPKI", "User IPC"))
+        figs.append(draw_lines(xvalue, single_left,[], xlabel, "exe_misp_MPKI", ""))
+    #leftnames=['base_tage_jalr_misp_rate','128_tage_jalr_misp_rate','256_tage_jalr_misp_rate','2048_tage_jalr_misp_rate']
+    #figs.append(draw_lines(xvalue, leftnames, [], xlabel, "tage jalr misprediction rate", ""))
+    #leftnames=['base_tage_jalr_hit_rate','128_tage_jalr_hit_rate','256_tage_jalr_hit_rate','2048_tage_jalr_hit_rate']
+    #figs.append(draw_lines(xvalue, leftnames, [], xlabel, "tage jalr hit rate", ""))
+    
     pp = PdfPages(resname)
     idx = 0
     for fig in figs:

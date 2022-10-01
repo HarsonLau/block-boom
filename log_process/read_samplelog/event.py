@@ -34,17 +34,17 @@ class StartInfo:
 # 用于记录每个事件的所有数据信息，支持直接+ - * /
 class EventInfo:
     value = []
-    totalvalue = 0
+    label = []
     name = ""
     def __init__(self, name):
         self.name = name
         self.value = []
-        self.totalvalue = 0
+        self.label = []
 
-    # 记录值
+    # 记录值和label，label用于表示是第几组中的event
     def addinfo(self, value, label):
         self.value.append(value)
-        self.totalvalue += value
+        self.label.append(label)
 
     # 根据eventname判断两个事件是否相同
     def isThis(self, name):
@@ -62,20 +62,14 @@ class EventInfo:
                 elif optype == "*":
                     val = self.value[idx] * other
                 elif optype == "/":
-                    val = 1.0 * self.value[idx] / other
+                    if other==0:
+                        val = 0
+                    else:
+                        val = 1.0 * self.value[idx] / other
                 else:
                     val = self.value[idx] + other
-                temp.addinfo(val, 0)
+                temp.addinfo(val, self.label[idx])
                 idx = idx + 1
-            
-            if optype == "-":
-                temp.totalvalue = self.totalvalue - other
-            elif optype == "*":
-                temp.totalvalue = self.totalvalue * other
-            elif optype == "/":
-                temp.totalvalue = 1.0 * self.totalvalue / other
-            else:
-                temp.totalvalue = self.totalvalue + other
 
         if isinstance(other, EventInfo):
             temp.name = "(" + self.name + optype + other.name + ")"
@@ -87,20 +81,14 @@ class EventInfo:
                 elif optype == "*":
                     val = self.value[idx] * other.value[idx]
                 elif optype == "/":
-                    val = 1.0 * self.value[idx] / other.value[idx]
+                    if other.value[idx]==0:
+                        val = 0
+                    else:
+                        val = 1.0 * self.value[idx] / other.value[idx]
                 else:
                     val = self.value[idx] + other.value[idx]
-                temp.addinfo(val, 0)
+                temp.addinfo(val, self.label[idx])
                 idx = idx + 1
-
-            if optype == "-":
-                temp.totalvalue = self.totalvalue - other.totalvalue
-            elif optype == "*":
-                temp.totalvalue = self.totalvalue * other.totalvalue
-            elif optype == "/":
-                temp.totalvalue = 1.0 * self.totalvalue / other.totalvalue
-            else:
-                temp.totalvalue = self.totalvalue + other.totalvalue
         return temp
 
     # 重载加减乘除运算
@@ -167,42 +155,48 @@ def cal_fraction(numerator, denominator, name):
 # 将startinfo和eventinfos中的信息保存成csv文件，用于excel查看，optype分为h和v，为两种不同的存储方式
 def saveEventInfo(startinfo, eventinfos, optype, benchname):
     bench = os.path.splitext(benchname)[0]
-    savename = bench+"_eventinfo"+".csv"
+    savename = bench+"_eventinfo_"+optype+".csv"
     f1 = open(savename, 'w')
 
     data = []
-    str1 = ","
-    str2 = "total_ipc,"
-    idx = 0
-    while idx < len(startinfo.ipc):
-        str1 = str1 + str(idx+1) + ","
-        str2 = str2 + str(startinfo.ipc[idx]) + ","
-        idx = idx + 1
-    data.append(str1)
-    data.append(str2)
-
-    for info in eventinfos:
-        str1 = info.name + ","
+    if optype == "v":
+        data.append("label," + "total_ipc,")
         idx = 0
-        while idx < len(info.value):
-            str1 = str1 + str(info.value[idx])
-            str1 = str1 + ","
-            idx = idx + 1  
+        for ipc in startinfo.ipc:
+            data.append(str(idx+1)+","+str(ipc)+",")
+            idx = idx + 1
+
+        for info in eventinfos:
+            data[0] = data[0] + info.name + ","
+            idx = 0
+            while idx < len(info.value):
+                if idx+1 == info.label[idx]:
+                    data[idx+1] = data[idx+1] + str(info.value[idx])
+                data[idx+1] = data[idx+1] + ","
+                idx = idx + 1                   
+    else:
+        str1 = ","
+        str2 = "total_ipc,"
+        idx = 0
+        while idx < len(startinfo.ipc):
+            str1 = str1 + str(idx+1) + ","
+            str2 = str2 + str(startinfo.ipc[idx]) + ","
+            idx = idx + 1
         data.append(str1)
+        data.append(str2)
+
+        for info in eventinfos:
+            str1 = info.name + ","
+            idx = 0
+            while idx < len(info.value):
+                if idx+1 == info.label[idx]:
+                    str1 = str1 + str(info.value[idx])
+                str1 = str1 + ","
+                idx = idx + 1  
+            data.append(str1)
     
     for d in data:
         f1.write(d + "\n")
-
-    f1.close()
-
-    savename = bench+"_totalinfo"+".csv"
-    f1 = open(savename, 'w')
-    f1.write(", total, max, min, stddev, sample_stddev\n")
-    for info in eventinfos:
-        str1 = info.name + "," + str(info.totalvalue) + "," + str(max(info.value)) + "," + str(min(info.value))
-        str1 = str1 + "," + str(np.std(info.value)) + "," + str(np.std(info.value, ddof=1)) + "\n"
-        f1.write(str1)
-    f1.close()
 
 
 # 从运行的log文件中获取startinfo和event事件信息
@@ -228,7 +222,7 @@ def readEventInfo(filename, eventdict):
             continue
 
         line = "{" + line.split("{")[1].split("}")[0] + "}"
-
+        #print(line)
         info = json.loads(line)
 
         if info['type'] == "max_inst":
@@ -251,10 +245,9 @@ def readEventInfo(filename, eventdict):
 
     file1.close()
 
-    eventsets = {}
     for info in eventinfos:
         name = info.name.replace(" ", "")
         if name in eventdict:
             info.name = eventdict[name]
-            eventsets[eventdict[name]] = info
-    return startinfo, eventinfos, eventsets
+
+    return startinfo, eventinfos

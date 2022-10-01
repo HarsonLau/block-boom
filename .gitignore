@@ -5,3 +5,8 @@ build_log/
 *.zip
 #ignore all files with postfix log
 *.log
+data/
+**samplectrl.txt
+**venv/
+boom_scala/ifu/bpd/gen.sh
+boom_scala/ifu/bpd/tage.template
