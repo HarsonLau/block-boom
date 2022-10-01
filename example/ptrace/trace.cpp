@@ -4,6 +4,8 @@
 
 void start_run_and_trace(char pathname[], char **args)
 {
+    // open a log file named 'perf.out' for logging
+    FILE* logfile = fopen("/home/spec_run/data/perf.out","w");
     pid_t child;
     int status;
     child = fork();
@@ -56,6 +58,7 @@ void start_run_and_trace(char pathname[], char **args)
             ptrace(PTRACE_SETREGSET, child, NT_PRSTATUS, &iov);
             //sampling function
             printf("---- sample: %d, pc : 0x%lx\n", sampletimes, regs.pc+4);
+            fprintf(logfile,"---- sample: %d, pc : 0x%lx\n", sampletimes, regs.pc+4);
             event_sample_process(sampletimes, regs.pc+4);
             sampletimes++;
             if(sampletimes > maxperiods)
