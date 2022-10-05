@@ -63,3 +63,6 @@ xalancbmk:
 
 int: perlbench bzip2 gcc gobmk hmmer sjeng libquantum h264ref omnetpp astar xalancbmk
 	echo “running all the int benchmarks”
+
+subset5: sjeng libquantum gcc hmmer xalancbmk
+	echo "running the five subsets"
