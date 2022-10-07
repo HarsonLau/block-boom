@@ -234,7 +234,7 @@ def draw_lines(xvalue, lnames, rnames, xlabel, ylabel1, ylabel2):
 def drawplot(resname):
     figs = []
     xvalue = datas['stage'].value
-    xlabel = "Running Stage (20M Instructions)"
+    xlabel = "Running Stage (200M Instructions)"
     # frontend
     # leftnames = ['icache_miss_rate', 'itlb_miss_rate']
     # figs.append(draw_lines(xvalue, leftnames, ['user_ipc'], xlabel, "ICache & ITLB Miss Rate", "User IPC"))
@@ -255,11 +255,17 @@ def drawplot(resname):
     # # branch
     #print(sys.argv[1])
     # enumerate the rows of sys.argv[1] and put the first column of each row into a list if they contain'br_tage_hit'
+    allrowname=[row[0] for row in csv.reader(open(sys.argv[1]))]
     rightnames=[row[0] for row in csv.reader(open(sys.argv[1])) if 'user_ipc' in row[0]]
     # enumerate the rightnames , split each right name by '_' and put the first column of each row into a list
     configs=[rightname.split('_')[0] for rightname in rightnames]
     leftnames = [row[0] for row in csv.reader(open(sys.argv[1])) if 'tage_br_hit_rate' in row[0]]
     #leftnames =['6-128-9_tage_br_hit_rate','6-2048-9_tage_br_hit_rate']
+    figs.append(draw_lines(xvalue, rightnames, [], xlabel,"User IPC", ""))
+    figs.append(draw_lines(xvalue, leftnames, [], xlabel, "tage br hit rate", ""))
+    figs.append(draw_lines(xvalue, [name for name in allrowname if 'tage_br_misp/hit'in name],[],xlabel,"tage_br_misp/hit cnt",""))
+    figs.append(draw_lines(xvalue, [name for name in allrowname if 'tage_br_misp_rate'in name],[],xlabel,"tage_br_misp/br cnt",""))
+    figs.append(draw_lines(xvalue, [name for name in allrowname if 'exe_misp_MPKI'in name],[],xlabel,"MPKI",""))
     figs.append(draw_lines(xvalue, leftnames, rightnames, xlabel, "tage br hit rate", "User IPC"))
     for config in configs:
         single_right=[rightname for rightname in rightnames if config in rightname]
@@ -271,6 +277,7 @@ def drawplot(resname):
     
     leftnames = [row[0] for row in csv.reader(open(sys.argv[1])) if 'tage_br_misp/hit' in row[0]]
     #leftnames=['base_tage_br_misp/hit','128_tage_br_misp/hit','256_tage_br_misp/hit','2048_tage_br_misp/hit']
+    figs.append(draw_lines(xvalue, leftnames, [], xlabel, "tage br misprediction/hit rate", ""))
     figs.append(draw_lines(xvalue, leftnames, rightnames, xlabel, "tage br misprediction/hit rate", "User IPC"))
     for config in configs:
         single_right=[rightname for rightname in rightnames if config in rightname]

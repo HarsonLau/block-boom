@@ -130,6 +130,12 @@ make config=<hash> <benchmark list>
 
 1.4 执行`process.py gcc_ckpt.log`,生成*.eventinfo_h.csv文件即可（此时可以打开看一下）
 
+可能会有很多benchmark产生的log文件需要处理，可以用这个shell 脚本处理某个目录下的所有log文件
+
+```bash
+for file in ../../data/1005data/*; do if test -f $file; then  python3 process.py $file; fi; done
+```
+
 
 ### 2. 对csv 进行后处理（截断，合并）
 在`boom_stop_data` 目录下新建了一个后处理[脚本](https://gist.github.com/HarsonLau/cd89edec765a348929d333f7f02f3ff2)，用于截断，合并多个配置产生的数据。两个必要的参数，input file list 和benchmark name。
