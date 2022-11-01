@@ -14,3 +14,4 @@ spec_run/4*/
 spec_run/999*/
 .vscode/
 .metals/
+**.pyc
