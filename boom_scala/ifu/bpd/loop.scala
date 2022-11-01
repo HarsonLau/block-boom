@@ -12,6 +12,7 @@ import boom.util.{BoomCoreStringPrefix}
 
 import scala.math.min
 
+//defined but not used, maybe just a hint
 case class BoomLoopPredictorParams(
   nWays: Int = 4,
   threshold: Int = 7
@@ -64,20 +65,26 @@ class LoopBranchPredictorBank(implicit p: Parameters) extends BranchPredictorBan
 
     val entries = Reg(Vec(nSets, new LoopEntry))
     val f2_entry = WireInit(entries(io.f2_req_idx))
+
+    //bypass: use update infos
     when (io.update_repair && io.update_idx === io.f2_req_idx) {
       f2_entry.s_cnt := io.update_meta.s_cnt
     } .elsewhen (io.update_mispredict && io.update_idx === io.f2_req_idx) {
       f2_entry.s_cnt := 0.U
     }
     val f3_entry = RegNext(f2_entry)
+
+    //bypass: use update infos
     val f3_scnt  = Mux(io.update_repair && io.update_idx === RegNext(io.f2_req_idx),
       io.update_meta.s_cnt,
       f3_entry.s_cnt)
     val f3_tag   = RegNext(io.f2_req_idx(tagSz+log2Ceil(nSets)-1,log2Ceil(nSets)))
 
+    //prediction default to last level's pred
     io.f3_pred := io.f3_pred_in
     io.f3_meta.s_cnt := f3_scnt
 
+    // only when hit and match and confident
     when (f3_entry.tag === f3_tag) {
       when (f3_scnt === f3_entry.p_cnt && f3_entry.conf === 7.U) {
         io.f3_pred := !io.f3_pred_in
@@ -92,6 +99,7 @@ class LoopBranchPredictorBank(implicit p: Parameters) extends BranchPredictorBan
     val f4_idx   = RegNext(RegNext(io.f2_req_idx))
 
 
+    //TODO:?
     when (f4_fire) {
       when (f4_entry.tag === f4_tag) {
         when (f4_scnt === f4_entry.p_cnt && f4_entry.conf === 7.U) {
@@ -178,7 +186,9 @@ class LoopBranchPredictorBank(implicit p: Parameters) extends BranchPredictorBan
 
   }
 
-
+  // val bankWidth = fetchWidth/nBanks
+  // medium BOOM fetchWidth = 4
+  // medium BOOM nBanks=1
   val columns = Seq.fill(bankWidth) { Module(new LoopBranchPredictorColumn) }
   val mems = Nil // TODO fix
   val f3_meta = Wire(Vec(bankWidth, new LoopMeta))
@@ -187,8 +197,9 @@ class LoopBranchPredictorBank(implicit p: Parameters) extends BranchPredictorBan
   val update_meta = s1_update.bits.meta.asTypeOf(Vec(bankWidth, new LoopMeta))
 
   for (w <- 0 until bankWidth) {
-    columns(w).io.f2_req_valid := s2_valid
-    columns(w).io.f2_req_idx  := s2_idx
+    columns(w).io.f2_req_valid := s2_valid // inherited from BranchPredictorBank
+    columns(w).io.f2_req_idx  := s2_idx // inherited from BranchPredictorBank
+    //TODO: io.resp_in(0).f2 & io.resp_in(0).f3
     columns(w).io.f3_req_fire := (s3_valid && s3_mask(w) && io.f3_fire &&
       RegNext(io.resp_in(0).f2(w).predicted_pc.valid && io.resp_in(0).f2(w).is_br))
 
