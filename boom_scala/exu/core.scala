@@ -583,12 +583,21 @@ class BoomCore(usingTrace: Boolean)(implicit p: Parameters) extends BoomModule
     event_counters.io.event_signals(29) :=  Mux(iss_val_notFull, 1.U, 0.U) //issue out has valid inst but not full
     event_counters.io.event_signals(30) :=  PopCount(spec_miss_issuop.asUInt)  //valid mis-wakeup issue uop number
 
-    event_counters.io.event_signals(31) :=  PopCount(exe_is_ld.asUInt)       //execute ld number
-    event_counters.io.event_signals(32) :=  PopCount(exe_is_st.asUInt)       //execute st number
-    event_counters.io.event_signals(33) :=  io.lsu.dtlb_valid_access            //valid dtlb req number
-    event_counters.io.event_signals(34) :=  io.lsu.dtlb_miss_num              //dtlb miss number
-    event_counters.io.event_signals(35) :=  Mux(io.lsu.perf.tlbMiss, 1.U, 0.U)  //d-tlb miss
-    event_counters.io.event_signals(36) :=  io.lsu.dcache_valid_access   //valid dcache access number
+    val valid_masks       = rob.io.commit.arch_valids.asUInt
+    val br_masks          = VecInit(rob.io.commit.uops.map(_.is_br)).asUInt
+    val jalr_masks        = VecInit(rob.io.commit.uops.map(_.is_jalr)).asUInt
+    val jal_masks         = VecInit(rob.io.commit.uops.map(_.is_jal)).asUInt
+    val taken_masks       = VecInit(rob.io.commit.uops.map(_.taken)).asUInt
+    val bpd_perfs = rob.io.commit.uops.map(_.bpd_perf)
+    val tage_hit_masks    = VecInit(bpd_perfs.map(_.tage_hit)).asUInt
+    val tage_taken_masks  = VecInit(bpd_perfs.map(_.tage_taken)).asUInt
+    event_counters.io.event_signals(31) := RegNext(PopCount(valid_masks & br_masks & tage_hit_masks))//br tage hit
+    event_counters.io.event_signals(32) := RegNext(PopCount(valid_masks & br_masks & tage_hit_masks & (tage_taken_masks ^ taken_masks)))//br tage misp
+    event_counters.io.event_signals(33) := RegNext(PopCount(valid_masks & jal_masks & tage_hit_masks))//tage jal hit
+    event_counters.io.event_signals(34) := RegNext(PopCount(valid_masks & jal_masks & tage_hit_masks & (tage_taken_masks ^ taken_masks)))//tage jal misp
+    event_counters.io.event_signals(35) := RegNext(PopCount(valid_masks & jalr_masks & tage_hit_masks))//tage jalr hit
+    event_counters.io.event_signals(36) := RegNext(PopCount(valid_masks & jalr_masks & tage_hit_masks & (tage_taken_masks ^ taken_masks)))//tage jalr misp
+    
     event_counters.io.event_signals(37) :=  io.lsu.dcache_nack_num   //d-cache load & store nack number
     event_counters.io.event_signals(38) :=  Mux(io.lsu.perf.acquire, 1.U, 0.U) //dcache send req to next level number
 
@@ -612,12 +621,7 @@ class BoomCore(usingTrace: Boolean)(implicit p: Parameters) extends BoomModule
     event_counters.io.event_signals(55) :=  PopCount(com_misp_ret.asUInt)     //com misp jalr-ret number
     event_counters.io.event_signals(56) :=  PopCount(com_misp_jalrcall.asUInt)  //com misp jalr-call number
 
-    event_counters.io.event_signals(57) :=  Mux(io.ptw.perf.l2miss, 1.U, 0.U) //L2 TLB miss
-    event_counters.io.event_signals(58) :=  Mux(misalign_excpt, 1.U, 0.U)  //misalign_excpt
-    event_counters.io.event_signals(59) :=  Mux(lstd_pagefault, 1.U, 0.U)  //lstd_pagefault
-    event_counters.io.event_signals(60) :=  Mux(fetch_pagefault, 1.U, 0.U)  //fetch_pagefault
-    event_counters.io.event_signals(61) :=  Mux(mini_exception, 1.U, 0.U)  //mini_exception
-    event_counters.io.event_signals(62) :=  Mux(rob.io.commit.rollback, 1.U, 0.U)  //rollback_cycles
+
   }
   
 

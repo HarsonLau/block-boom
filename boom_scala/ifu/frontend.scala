@@ -247,6 +247,8 @@ class FetchBundle(implicit p: Parameters) extends BoomBundle
   val fsrc    = UInt(BSRC_SZ.W)
   // Source of the prediction to this bundle
   val tsrc    = UInt(BSRC_SZ.W)
+
+  val bpd_perf      = Vec(fetchWidth, new BranchPredictionPerf)
 }
 
 
@@ -602,7 +604,8 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   f3_fetch_bundle.fsrc := f3_imemresp.fsrc
   f3_fetch_bundle.tsrc := f3_imemresp.tsrc
   f3_fetch_bundle.shadowed_mask := f3_shadowed_mask
-
+  f3_fetch_bundle.bpd_perf := f3_bpd_resp.io.deq.bits.preds.map(_.perf)
+  
   // Tracks trailing 16b of previous fetch packet
   val f3_prev_half    = Reg(UInt(16.W))
   // Tracks if last fetchpacket contained a half-inst
