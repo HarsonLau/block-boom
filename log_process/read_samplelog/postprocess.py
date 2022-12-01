@@ -54,11 +54,21 @@ if __name__ == "__main__":
                     min_length = nonempty_count
 
     hash2config = {'d63a7e6a7b8556f519bb0f482728c7018542622e':'base',
-    '3ff5a552e15aba05d444ade657339caeb904d437':'6-128-7',
-    '47045a86e26c416ee18ddfbadb385fff7fe58251':'6-256-7',
-    '5108f7e7e673eed5396932befa8777e05f296d2a':'6-512-7',
+    'b8cdcb02d0cb4efec580941a0a8a122c73ce3eee':'6-2048-9',
+    '9f8a97e32339da8ae24358b269b6072cdc438d9e':'6-1024-9',
+    '948eab349b4f1fd15eb4251997f276ead74779a1':'6-512-9',
+    '9b47a9ca03532efdac398e7bd214b436d9193267':'6-256-9',
+    '55a30b5c4774c93430e40d1af0c8d2ea272f99e7':'6-128-9',
+    'f6fde52c85604a6fb82ad081e90d4cfcb7efed4e':'6-2048-8',
+    '05f66321a2cee03ba3e5fd23b27221565cc2e68a':'6-1024-8',
+    '64c0e5393ee2d17faa6f4021a86f0269f0fba8f9':'6-512-8',
+    '632f580d5a696c77cf6c1a246e2b7f19f36a5cb4':'6-256-8',
+    'df774d2d723cdae2050403b0d59372216927c4fd':'6-128-8',
+    '1c4a65b09427c67f0ec82b25b14429ea385891b7':'6-2048-7',
     '125a459b7e2310e23478a4732c36b383f5b71a50':'6-1024-7',
-    '1c4a65b09427c67f0ec82b25b14429ea385891b7':'6-2048-7'
+    '5108f7e7e673eed5396932befa8777e05f296d2a':'6-512-7',
+    '47045a86e26c416ee18ddfbadb385fff7fe58251':'6-256-7',
+    '3ff5a552e15aba05d444ade657339caeb904d437':'6-128-7
     }
 
     whitelist=["exe_misp_MPKI","user_ipc" ,"tage_br_misp_rate" ,"tage_br_hit_rate" ,"tage_jalr_misp_rate" ,"tage_jalr_hit_rate" ,"tage_br_misp/hit"]
