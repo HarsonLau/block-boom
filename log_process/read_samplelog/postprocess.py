@@ -23,7 +23,7 @@ if __name__ == "__main__":
     if args.dir != None:
         for root, dirs, files in os.walk(args.dir):
             for file in files:
-                if args.benchmark in file and "eventinfo" in file:
+                if args.benchmark in file and "eventinfo" in file and "csv" in file:
                     file_list.append(os.path.join(root, file))
     else:
         file_list = args.input
@@ -68,7 +68,7 @@ if __name__ == "__main__":
     '125a459b7e2310e23478a4732c36b383f5b71a50':'6-1024-7',
     '5108f7e7e673eed5396932befa8777e05f296d2a':'6-512-7',
     '47045a86e26c416ee18ddfbadb385fff7fe58251':'6-256-7',
-    '3ff5a552e15aba05d444ade657339caeb904d437':'6-128-7
+    '3ff5a552e15aba05d444ade657339caeb904d437':'6-128-7'
     }
 
     whitelist=["exe_misp_MPKI","user_ipc" ,"tage_br_misp_rate" ,"tage_br_hit_rate" ,"tage_jalr_misp_rate" ,"tage_jalr_hit_rate" ,"tage_br_misp/hit"]
@@ -89,6 +89,8 @@ if __name__ == "__main__":
             # get the hash part from the basename of the file
             hash = os.path.basename(file).split('-')[1] 
             # get the corresponding configuration
+            if hash not in hash2config:
+                continue
             config = hash2config[hash]
             with open(file, 'r') as f1:
                 reader = csv.reader(f1)
