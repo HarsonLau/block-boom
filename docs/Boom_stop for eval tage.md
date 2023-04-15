@@ -15,16 +15,20 @@
   - 手动
   - bash脚本
 
+- 获取一个FPGA开发板
+  - 实验室目前至少有两种FPGA开发板，每种都有其使用的文档，建议先熟读文档
+
 - 将mcs拿到本地烧录进FPGA
   - 手动
-  - 脚本(by 崔博)
+  - 脚本(实验室某台笔记本上有一个一键烧录的脚本，应该跟这台笔记本是强耦合的)
 
 - 给FPGA 准备操作系统镜像(once for all)
   - 利用文档和脚本自己做，但也可能会遇到问题
+    - 可能需要自己调整SD卡分区大小，安装一些工具（比较麻烦）等
   - 直接复制我的
 
 - 准备Benchmark
-  - 编译 SPEC 2006 RISC-V 
+  - 编译 SPEC 2006 RISC-V 版
   - 打包
 
 - 跑benchmark获取采样数据
@@ -49,7 +53,7 @@ tage-signals 相比liuhao分支，添加了用于统计tage测评的信号,目�
 tage-eval 相比tage-signals, 修改了tage的各种配置
 ```
 
-可以通过`git rebase`快速同步上游的修改。
+在这里使用git 进行项目管理的优势是，可以通过`git rebase`快速同步上游的修改。
 
 ## 一、编译 BOOMv3
 
@@ -58,6 +62,11 @@ tage-eval 相比tage-signals, 修改了tage的各种配置
 ### 1. 生成不同TAGE配置的BOOM 代码
 
 >我对Boom_stop 的开发是在167云服务器上进行的。
+
+>我需要修改TAGE的配置，针对每种配置进行测评。配置数量很多，因此我希望有一个脚本可以自动化生成不同的配置。并且进行git commit。
+>commit message 中会包含这个配置的信息，比如tagSize 和 组数。
+>git commit 之后，我可以用commit id 来标识这个配置，然后在后续的测评中使用这个commit id 来标识这个配置。
+>通过这种方式，我可以快速地建立数据和代码的对应关系。
 
 在`boom_scala/ifu/bpd` 目录下 通过以下脚本`gen.sh`生成不同tagSize 和 组数的BOOM 配置，并进行git commit。
 commit 的message 是 `tage-config-6-{nSet}-{tagSz}`。
@@ -85,9 +94,11 @@ done
 
 ### 2.build mcs 
 
-build mcs 需要在21服务器上进行, 所以需要获取修改好的代码
+build mcs 需要在21服务器上进行, 所以需要获取修改好的BOOM代码
 
 在21服务器上通过rsync 同步云服务器的代码
+>如果没使用过rsync，可以自行搜索一下
+>如果不想使用rsync，也可以用scp，sftp等方式
 
 ```bash
 rsync -a liuhao@39.105.198.167:~/boom_stop/ ./boom_stop
@@ -103,12 +114,10 @@ build 过程可能很长(> 40 mins)，建议开一个screen 以防连接断开
 
 > 不了解screen的请自行搜索一下
 
-build 主要采用这个[这个脚本](https://github.com/HarsonLau/boom_stop/blob/b48fdcc333498e635f22249fd29a602e1dfb0921/batch_build_mcs.sh)
-> 可以自己看看这个脚本的功能和副作用，很简单
+build 主要使用这个[这个脚本](https://github.com/HarsonLau/boom_stop/blob/b48fdcc333498e635f22249fd29a602e1dfb0921/batch_build_mcs.sh)
+这个脚本的功能主要是，从git log 中找到包含某个keyword的commit，然后对这些commit进行build。并将build出来的mcs文件以commit id 命名 放在mcs目录下。
 
-- 这个脚本接一个参数 keyword，它会去git log 中找包含这一keyword的git commit message，如果对应的commit 没被build过，就会进行build。
-- build之后的mcs文件以对应的git commit 的id 命名，便于跟具体的代码进行对应。
-- mcs 文件应该会放在mcs目录下
+> 建议自己看看这个脚本的功能和副作用，很简单
 
 ```
 screen 
@@ -119,7 +128,9 @@ screen
 
 ### 自行构建
 
-总体流程还是使用之前的make sd image 和make sd card。需要做一个修改，将崔博仓库中修改后的内核代码，移到20服务器上合适的位置，构建内核。
+总体流程还是使用之前的make sd image 和make sd card (有文档)。
+
+需要做一个修改，将崔博仓库中修改后的内核代码，移到20服务器上合适的位置，构建内核。
 
 使用这个脚本构建的内存卡，分区会很小，可用空间可能只有200MB左右。所以对分区进行扩容。
 
@@ -141,6 +152,8 @@ screen
 ## 三、benchmark
 
  spec 2006的编译及打包，见另一篇[文档](https://github.com/HarsonLau/boom_stop/blob/33a86a6305c8ca8f9e6e9c2b671171dc38f47a05/docs/Build%20Spec_2006%20On%20mprc238.md)
+
+ > 由于spec 2006的编译过程非常复杂，所以我将它写在了另一个文档中。
 
 ## 四、FPGA执行，生成log
 
