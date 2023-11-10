@@ -130,7 +130,7 @@ class WithNSmallBooms(n: Int = 1, overrideIdOffset: Option[Int] = None) extends 
  * 2-wide BOOM.
  */
 class WithNMediumBooms(n: Int = 1, overrideIdOffset: Option[Int] = None) extends Config(
-  new WithTAGELBPD ++ // Default to TAGE-L BPD
+  new WithBTBBPD ++ // Default to TAGE-L BPD
   new Config((site, here, up) => {
     case TilesLocated(InSubsystem) => {
       val prev = up(TilesLocated(InSubsystem), site)
@@ -471,6 +471,29 @@ class WithBoom2BPD extends Config((site, here, up) => {
         btb.io.resp_in(0)  := bim.io.resp
         gshare.io.resp_in(0) := btb.io.resp
         (preds, gshare.io.resp)
+      })
+    )))
+    case other => other
+  }
+})
+
+class WithBTBBPD extends Config((site, here, up) => {
+  case TilesLocated(InSubsystem) => up(TilesLocated(InSubsystem), site) map {
+    case tp: BoomTileAttachParams => tp.copy(tileParams = tp.tileParams.copy(core = tp.tileParams.core.copy(
+      bpdMaxMetaLength = 45,
+      globalHistoryLength = 16,
+      localHistoryLength = 1,
+      localHistoryNSets = 0,
+      branchPredictor = ((resp_in: BranchPredictionBankResponse, p: Parameters) => {
+        // gshare is just variant of TAGE with 1 table
+        val btb = Module(new BTBBranchPredictorBank()(p))
+        val bim = Module(new BIMBranchPredictorBank()(p))
+        val preds = Seq(bim, btb)
+        preds.map(_.io := DontCare)
+
+        bim.io.resp_in(0)  := resp_in
+        btb.io.resp_in(0)  := bim.io.resp
+        (preds, btb.io.resp)
       })
     )))
     case other => other
