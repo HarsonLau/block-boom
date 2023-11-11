@@ -21,7 +21,7 @@ case class BoomLoopPredictorParams(
 class LoopBranchPredictorBank(implicit p: Parameters) extends BranchPredictorBank()(p)
 {
   val tagSz = 10
-  override val nSets = 16
+  override val nSets = 16 / nBanks
 
 
 

@@ -221,7 +221,8 @@ class TageBranchPredictorBank(params: BoomTageParams = BoomTageParams())(implici
 
   val tt = params.tableInfo map {
     case (n, l, s) => {
-      val t = Module(new TageTable(n, s, l, params.uBitPeriod))
+      // TODO: this is a hack to ensure that the total storage budget does not change after increasing the fetch width
+      val t = Module(new TageTable(n / nBanks, s, l, params.uBitPeriod))
       t.io.f1_req_valid := RegNext(io.f0_valid)
       t.io.f1_req_pc    := RegNext(io.f0_pc)
       t.io.f1_req_ghist := io.f1_ghist
