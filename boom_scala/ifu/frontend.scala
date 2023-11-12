@@ -199,6 +199,7 @@ trait HasBoomFTBParameters extends HasBoomFrontendParameters{
   val totalSlot = numBrSlot + 1
   val predictWidth = fetchWidth
   val predictBytes = fetchBytes
+  val instOffsetBits = log2Ceil(coreInstBytes) //corresponds to  `instOffsetBits` in XiangShan
 }
 
 
