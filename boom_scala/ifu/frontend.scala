@@ -193,6 +193,13 @@ trait HasBoomFrontendParameters extends HasL1ICacheParameters
   }
 }
 
+trait HasBoomFTBParameters extends HasBoomFrontendParameters{
+  val numBr = 2
+  val numBrSlot = numBr - 1
+  val totalSlot = numBrSlot + 1
+  val predictWidth = fetchWidth
+  val predictBytes = fetchBytes
+}
 
 
 /**

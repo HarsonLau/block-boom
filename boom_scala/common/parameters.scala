@@ -57,6 +57,7 @@ case class BoomCoreParams(
   enableICacheDelay: Boolean = false,
 
   /* branch prediction */
+  numBr: Int = 2,
   enableBranchPrediction: Boolean = true,
   branchPredictor: Function2[BranchPredictionBankResponse, Parameters, Tuple2[Seq[BranchPredictorBank], BranchPredictionBankResponse]] = ((resp_in: BranchPredictionBankResponse, p: Parameters) => (Nil, resp_in)),
   globalHistoryLength: Int = 64,

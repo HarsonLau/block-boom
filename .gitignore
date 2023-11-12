@@ -1,0 +1,14 @@
+data
+.vscode
+.metals
+build_log
+mcs
+mcs_build_log
+sims
+spec_run
+*txt
+build.sh
+eval-tage.sh
+**__pycache__
+*template
+gen.sh
