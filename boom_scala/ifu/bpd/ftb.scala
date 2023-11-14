@@ -44,6 +44,55 @@ object ZeroExt {
   }
 }
 
+trait BPUUtils extends HasBoomFTBParameters {
+  // circular shifting
+  def circularShiftLeft(source: UInt, len: Int, shamt: UInt): UInt = {
+    val res = Wire(UInt(len.W))
+    val higher = source << shamt
+    val lower = source >> (len.U - shamt)
+    res := higher | lower
+    res
+  }
+
+  def circularShiftRight(source: UInt, len: Int, shamt: UInt): UInt = {
+    val res = Wire(UInt(len.W))
+    val higher = source << (len.U - shamt)
+    val lower = source >> shamt
+    res := higher | lower
+    res
+  }
+
+  // To be verified
+  def satUpdate(old: UInt, len: Int, taken: Bool): UInt = {
+    val oldSatTaken = old === ((1 << len)-1).U
+    val oldSatNotTaken = old === 0.U
+    Mux(oldSatTaken && taken, ((1 << len)-1).U,
+      Mux(oldSatNotTaken && !taken, 0.U,
+        Mux(taken, old + 1.U, old - 1.U)))
+  }
+
+  def signedSatUpdate(old: SInt, len: Int, taken: Bool): SInt = {
+    val oldSatTaken = old === ((1 << (len-1))-1).S
+    val oldSatNotTaken = old === (-(1 << (len-1))).S
+    Mux(oldSatTaken && taken, ((1 << (len-1))-1).S,
+      Mux(oldSatNotTaken && !taken, (-(1 << (len-1))).S,
+        Mux(taken, old + 1.S, old - 1.S)))
+  }
+
+  def getFallThroughAddr(start: UInt, carry: Bool, pft: UInt) = {
+    val higher = start.head(vaddrBitsExtended-log2Ceil(predictWidth)-instOffsetBits)
+    Cat(Mux(carry, higher+1.U, higher), pft, 0.U(instOffsetBits.W))
+  }
+
+  // def foldTag(tag: UInt, l: Int): UInt = {
+  //   val nChunks = (tag.getWidth + l - 1) / l
+  //   val chunks = (0 until nChunks).map { i =>
+  //     tag(min((i+1)*l, tag.getWidth)-1, i*l)
+  //   }
+  //   ParallelXOR(chunks)
+  // }
+}
+
 class FtbSlot(val offsetLen: Int, val subOffsetLen: Option[Int] = None)(implicit p: Parameters) extends BoomBundle with FTBParams {
   if (subOffsetLen.isDefined) {
     require(subOffsetLen.get <= offsetLen)
@@ -123,5 +172,116 @@ class FtbSlot(val offsetLen: Int, val subOffsetLen: Option[Int] = None)(implicit
     this.valid := that.valid
     this.lower := ZeroExt(that.lower, this.offsetLen)
   }
+
+}
+
+class FTBEntry(implicit p: Parameters) extends BoomBundle with FTBParams with BPUUtils{
+
+
+  val valid       = Bool()
+
+  val brSlots = Vec(numBrSlot, new FtbSlot(BR_OFFSET_LEN))
+
+  val tailSlot = new FtbSlot(JMP_OFFSET_LEN, Some(BR_OFFSET_LEN))
+
+  // Partial Fall-Through Address
+  val pftAddr     = UInt(log2Up(predictWidth).W)
+  val carry       = Bool()
+
+  val isCall      = Bool()
+  val isRet       = Bool()
+  val isJalr      = Bool()
+
+  val last_may_be_rvi_call = Bool()
+
+  val always_taken = Vec(numBr, Bool())
+
+  def getSlotForBr(idx: Int): FtbSlot = {
+    require(idx <= numBr-1)
+    (idx, numBr) match {
+      case (i, n) if i == n-1 => this.tailSlot
+      case _ => this.brSlots(idx)
+    }
+  }
+  def allSlotsForBr = {
+    (0 until numBr).map(getSlotForBr(_))
+  }
+  def setByBrTarget(brIdx: Int, pc: UInt, target: UInt) = {
+    val slot = getSlotForBr(brIdx)
+    slot.setLowerStatByTarget(pc, target, brIdx == numBr-1)
+  }
+  def setByJmpTarget(pc: UInt, target: UInt) = {
+    this.tailSlot.setLowerStatByTarget(pc, target, false)
+  }
+
+  def getTargetVec(pc: UInt, last_stage: Option[Tuple2[UInt, Bool]] = None) = {
+    VecInit((brSlots :+ tailSlot).map(_.getTarget(pc, last_stage)))
+  }
+
+  def getOffsetVec = VecInit(brSlots.map(_.offset) :+ tailSlot.offset)
+  def isJal = !isJalr
+  def getFallThrough(pc: UInt, last_stage_entry: Option[Tuple2[FTBEntry, Bool]] = None) = {
+    if (last_stage_entry.isDefined) {
+      var stashed_carry = RegEnable(last_stage_entry.get._1.carry, last_stage_entry.get._2)
+      getFallThroughAddr(pc, stashed_carry, pftAddr)
+    } else {
+      getFallThroughAddr(pc, carry, pftAddr)
+    }
+  }
+
+  def hasBr(offset: UInt) =
+    brSlots.map{ s => s.valid && s.offset <= offset}.reduce(_||_) ||
+    (tailSlot.valid && tailSlot.offset <= offset && tailSlot.sharing)
+
+  def getBrMaskByOffset(offset: UInt) =
+    brSlots.map{ s => s.valid && s.offset <= offset } :+
+    (tailSlot.valid && tailSlot.offset <= offset && tailSlot.sharing)
+
+  def getBrRecordedVec(offset: UInt) = {
+    VecInit(
+      brSlots.map(s => s.valid && s.offset === offset) :+
+      (tailSlot.valid && tailSlot.offset === offset && tailSlot.sharing)
+    )
+  }
+
+  def brIsSaved(offset: UInt) = getBrRecordedVec(offset).reduce(_||_)
+
+  def brValids = {
+    VecInit(
+      brSlots.map(_.valid) :+ (tailSlot.valid && tailSlot.sharing)
+    )
+  }
+
+  def noEmptySlotForNewBr = {
+    VecInit(brSlots.map(_.valid) :+ tailSlot.valid).reduce(_&&_)
+  }
+
+  def newBrCanNotInsert(offset: UInt) = {
+    val lastSlotForBr = tailSlot
+    lastSlotForBr.valid && lastSlotForBr.offset < offset
+  }
+
+  def jmpValid = {
+    tailSlot.valid && !tailSlot.sharing
+  }
+
+  def brOffset = {
+    VecInit(brSlots.map(_.offset) :+ tailSlot.offset)
+  }
+
+  // def display(cond: Bool): Unit = {
+  //   XSDebug(cond, p"-----------FTB entry----------- \n")
+  //   XSDebug(cond, p"v=${valid}\n")
+  //   for(i <- 0 until numBr) {
+  //     XSDebug(cond, p"[br$i]: v=${allSlotsForBr(i).valid}, offset=${allSlotsForBr(i).offset}," +
+  //       p"lower=${Hexadecimal(allSlotsForBr(i).lower)}\n")
+  //   }
+  //   XSDebug(cond, p"[tailSlot]: v=${tailSlot.valid}, offset=${tailSlot.offset}," +
+  //     p"lower=${Hexadecimal(tailSlot.lower)}, sharing=${tailSlot.sharing}}\n")
+  //   XSDebug(cond, p"pftAddr=${Hexadecimal(pftAddr)}, carry=$carry\n")
+  //   XSDebug(cond, p"isCall=$isCall, isRet=$isRet, isjalr=$isJalr\n")
+  //   XSDebug(cond, p"last_may_be_rvi_call=$last_may_be_rvi_call\n")
+  //   XSDebug(cond, p"------------------------------- \n")
+  // }
 
 }
