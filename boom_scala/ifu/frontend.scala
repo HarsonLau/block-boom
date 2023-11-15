@@ -298,7 +298,8 @@ class BoomFrontendIO(implicit p: Parameters) extends BoomBundle
   val bpsrc_f2 = Input(Bool())
   val bpsrc_f3 = Input(Bool())
   val bpsrc_core = Input(Bool())
-  
+
+  val fetchbuffer_inst_count = Input(UInt(log2Ceil(numFetchBufferEntries+1).W))
 }
 
 /**
@@ -882,6 +883,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     Module(new Queue(new FetchBundle, 1, pipe=true, flow=false))}
 
   val fb  = Module(new FetchBuffer)
+  io.cpu.fetchbuffer_inst_count := fb.io.count
   val ftq = Module(new FetchTargetQueue)
 
   // When we mispredict, we need to repair

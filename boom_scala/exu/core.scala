@@ -620,6 +620,7 @@ class BoomCore(usingTrace: Boolean)(implicit p: Parameters) extends BoomModule
     event_counters.io.event_signals(54) :=  PopCount(com_misp_jalr.asUInt)   //com misp jalr number
     event_counters.io.event_signals(55) :=  PopCount(com_misp_ret.asUInt)     //com misp jalr-ret number
     event_counters.io.event_signals(56) :=  PopCount(com_misp_jalrcall.asUInt)  //com misp jalr-call number
+    event_counters.io.event_signals(57) :=  Mux(io.ifu.fetchbuffer_inst_count===0.U, 1.U, 0.U)
 
 
   }
