@@ -6,6 +6,7 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
+import freechips.rocketchip.util._
 
 import boom.common._
 import boom.util.{BoomCoreStringPrefix}
@@ -285,3 +286,30 @@ class FTBEntry(implicit p: Parameters) extends BoomBundle with FTBParams with BP
   // }
 
 }
+
+class FTBEntryWithTag(implicit p: Parameters) extends BoomBundle with FTBParams {
+  val entry = new FTBEntry
+  val tag = UInt(tagSize.W)
+  // def display(cond: Bool): Unit = {
+  //   entry.display(cond)
+  //   XSDebug(cond, p"tag is ${Hexadecimal(tag)}\n------------------------------- \n")
+  // }
+}
+
+class FTBMeta(implicit p: Parameters) extends BoomBundle with FTBParams {
+  val writeWay = UInt(log2Ceil(numWays).W)
+  val hit = Bool()
+  // val pred_cycle = if (!env.FPGAPlatform) Some(UInt(64.W)) else None
+  val replacer = ReplacementPolicy.fromString("plru", 4)
+}
+
+object FTBMeta {
+  def apply(writeWay: UInt, hit: Bool, pred_cycle: UInt)(implicit p: Parameters): FTBMeta = {
+    val e = Wire(new FTBMeta)
+    e.writeWay := writeWay
+    e.hit := hit
+    // e.pred_cycle.map(_ := pred_cycle)
+    e
+  }
+}
+
