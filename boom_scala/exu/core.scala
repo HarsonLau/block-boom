@@ -620,9 +620,16 @@ class BoomCore(usingTrace: Boolean)(implicit p: Parameters) extends BoomModule
     event_counters.io.event_signals(54) :=  PopCount(com_misp_jalr.asUInt)   //com misp jalr number
     event_counters.io.event_signals(55) :=  PopCount(com_misp_ret.asUInt)     //com misp jalr-ret number
     event_counters.io.event_signals(56) :=  PopCount(com_misp_jalrcall.asUInt)  //com misp jalr-call number
-    event_counters.io.event_signals(57) :=  Mux(io.ifu.fetchbuffer_inst_count===0.U, 1.U, 0.U)
-
-
+    event_counters.io.event_signals(57) :=  Mux(io.ifu.fetchbuffer_empty, 1.U, 0.U)  //fetch buffer empty cycles
+    event_counters.io.event_signals(58) :=  Mux(io.ifu.fetchbuffer_full, 1.U, 0.U)  //fetch buffer full cycles
+    event_counters.io.event_signals(59) :=  Mux(io.ifu.fetchbuffer_1_8, 1.U, 0.U)  //fetch buffer 1/8 full cycles
+    event_counters.io.event_signals(60) :=  Mux(io.ifu.fetchbuffer_2_8, 1.U, 0.U)  //fetch buffer 2/8 full cycles
+    event_counters.io.event_signals(61) :=  Mux(io.ifu.fetchbuffer_3_8, 1.U, 0.U)  //fetch buffer 3/8 full cycles
+    event_counters.io.event_signals(62) :=  Mux(io.ifu.fetchbuffer_4_8, 1.U, 0.U)  //fetch buffer 4/8 full cycles
+    event_counters.io.event_signals(63) :=  Mux(io.ifu.fetchbuffer_5_8, 1.U, 0.U)  //fetch buffer 5/8 full cycles
+    event_counters.io.event_signals(64) :=  Mux(io.ifu.fetchbuffer_6_8, 1.U, 0.U)  //fetch buffer 6/8 full cycles
+    event_counters.io.event_signals(65) :=  Mux(io.ifu.fetchbuffer_7_8, 1.U, 0.U)  //fetch buffer 7/8 full cycles
+    event_counters.io.event_signals(66) :=  Mux(io.ifu.fetchbuffer_8_8, 1.U, 0.U)  //fetch buffer 8/8 full cycles
   }
   
 

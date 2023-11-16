@@ -159,7 +159,7 @@ class FetchBuffer(implicit p: Parameters) extends BoomModule
   }.otherwise{
     val head_idx = OHToUInt(head)
     val tail_idx = OHToUInt(tail_rows.asUInt)
-    io.count := Mux(tail_idx > head_idx, tail_idx - head_idx, tail_idx + numRows.U - head_idx)
+    io.count := Mux(tail_idx > head_idx, (tail_idx - head_idx) * coreWidth.asUInt, (tail_idx + numRows.U - head_idx) * coreWidth.asUInt)
   }
 
   //-------------------------------------------------------------

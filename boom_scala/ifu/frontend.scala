@@ -299,7 +299,17 @@ class BoomFrontendIO(implicit p: Parameters) extends BoomBundle
   val bpsrc_f3 = Input(Bool())
   val bpsrc_core = Input(Bool())
 
-  val fetchbuffer_inst_count = Input(UInt(log2Ceil(numFetchBufferEntries+1).W))
+  // val fetchbuffer_inst_count = Input(UInt(log2Ceil(numFetchBufferEntries+1).W))
+  val fetchbuffer_empty = Input(Bool())
+  val fetchbuffer_full = Input(Bool())
+  val fetchbuffer_1_8 = Input(Bool())
+  val fetchbuffer_2_8 = Input(Bool())
+  val fetchbuffer_3_8 = Input(Bool())
+  val fetchbuffer_4_8 = Input(Bool())
+  val fetchbuffer_5_8 = Input(Bool())
+  val fetchbuffer_6_8 = Input(Bool())
+  val fetchbuffer_7_8 = Input(Bool())
+  val fetchbuffer_8_8 = Input(Bool())
 }
 
 /**
@@ -883,7 +893,19 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     Module(new Queue(new FetchBundle, 1, pipe=true, flow=false))}
 
   val fb  = Module(new FetchBuffer)
-  io.cpu.fetchbuffer_inst_count := fb.io.count
+  // io.cpu.fetchbuffer_inst_count := fb.io.count
+  io.cpu.fetchbuffer_empty := fb.io.count === 0.U
+  io.cpu.fetchbuffer_full  := fb.io.count === numFetchBufferEntries.U
+  io.cpu.fetchbuffer_1_8 := fb.io.count <= (numFetchBufferEntries/8).U
+  io.cpu.fetchbuffer_2_8 := fb.io.count <= (numFetchBufferEntries/4).U && fb.io.count > (numFetchBufferEntries/8).U
+  io.cpu.fetchbuffer_3_8 := fb.io.count <= (numFetchBufferEntries/8 * 3).U && fb.io.count > (numFetchBufferEntries/8 * 2).U
+  io.cpu.fetchbuffer_4_8 := fb.io.count <= (numFetchBufferEntries/2).U && fb.io.count > (numFetchBufferEntries/8 * 3).U
+  io.cpu.fetchbuffer_5_8 := fb.io.count <= (numFetchBufferEntries/8 * 5).U && fb.io.count > (numFetchBufferEntries/8 * 4).U
+  io.cpu.fetchbuffer_6_8 := fb.io.count <= (numFetchBufferEntries/4 * 3).U && fb.io.count > (numFetchBufferEntries/8 * 5).U
+  io.cpu.fetchbuffer_7_8 := fb.io.count <= (numFetchBufferEntries/8 * 7).U && fb.io.count > (numFetchBufferEntries/8 * 6).U
+  io.cpu.fetchbuffer_8_8 := fb.io.count <= (numFetchBufferEntries).U && fb.io.count > (numFetchBufferEntries/8 * 7).U 
+
+
   val ftq = Module(new FetchTargetQueue)
 
   // When we mispredict, we need to repair
