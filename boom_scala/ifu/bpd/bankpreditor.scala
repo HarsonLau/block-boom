@@ -222,7 +222,7 @@ class BlockBranchPredictionUpdate(implicit p: Parameters) extends BoomBundle()(p
   //val cfi_is_ret  = Bool()
 
   val ghist = new GlobalHistory
-  val lhist = Vec(nBanks, UInt(localHistoryLength.W))
+  val lhist = Vec(nBPBanks, UInt(localHistoryLength.W))
 
 
   // What did this CFI jump to?

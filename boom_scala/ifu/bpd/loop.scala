@@ -179,14 +179,14 @@ class LoopBranchPredictorBank(implicit p: Parameters) extends BranchPredictorBan
   }
 
 
-  val columns = Seq.fill(bankWidth) { Module(new LoopBranchPredictorColumn) }
+  val columns = Seq.fill(BPBankWidth) { Module(new LoopBranchPredictorColumn) }
   val mems = Nil // TODO fix
-  val f3_meta = Wire(Vec(bankWidth, new LoopMeta))
+  val f3_meta = Wire(Vec(BPBankWidth, new LoopMeta))
   override val metaSz = f3_meta.asUInt.getWidth
 
-  val update_meta = s1_update.bits.meta.asTypeOf(Vec(bankWidth, new LoopMeta))
+  val update_meta = s1_update.bits.meta.asTypeOf(Vec(BPBankWidth, new LoopMeta))
 
-  for (w <- 0 until bankWidth) {
+  for (w <- 0 until BPBankWidth) {
     columns(w).io.f2_req_valid := s2_valid
     columns(w).io.f2_req_idx  := s2_idx
     columns(w).io.f3_req_fire := (s3_valid && s3_mask(w) && io.f3_fire &&

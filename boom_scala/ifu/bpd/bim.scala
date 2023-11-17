@@ -16,7 +16,7 @@ import scala.math.min
 class BIMMeta(implicit p: Parameters) extends BoomBundle()(p)
   with HasBoomFrontendParameters
 {
-  val bims  = Vec(bankWidth, UInt(2.W))
+  val bims  = Vec(BPBankWidth, UInt(2.W))
 }
 
 case class BoomBIMParams(
@@ -47,28 +47,28 @@ class BIMBranchPredictorBank(params: BoomBIMParams = BoomBIMParams())(implicit p
   when (reset_idx === (nSets-1).U) { doing_reset := false.B }
 
 
-  val data  = SyncReadMem(nSets, Vec(bankWidth, UInt(2.W)))
+  val data  = SyncReadMem(nSets, Vec(BPBankWidth, UInt(2.W)))
 
-  val mems = Seq(("bim", nSets, bankWidth * 2))
+  val mems = Seq(("bim", nSets, BPBankWidth * 2))
 
   val s2_req_rdata    = RegNext(data.read(s0_idx   , s0_valid))
 
-  val s2_resp         = Wire(Vec(bankWidth, Bool()))
+  val s2_resp         = Wire(Vec(BPBankWidth, Bool()))
 
-  for (w <- 0 until bankWidth) {
+  for (w <- 0 until BPBankWidth) {
 
     s2_resp(w)        := s2_valid && s2_req_rdata(w)(1) && !doing_reset
     s2_meta.bims(w)   := s2_req_rdata(w)
   }
 
 
-  val s1_update_wdata   = Wire(Vec(bankWidth, UInt(2.W)))
-  val s1_update_wmask   = Wire(Vec(bankWidth, Bool()))
+  val s1_update_wdata   = Wire(Vec(BPBankWidth, UInt(2.W)))
+  val s1_update_wmask   = Wire(Vec(BPBankWidth, Bool()))
   val s1_update_meta    = s1_update.bits.meta.asTypeOf(new BIMMeta)
   val s1_update_index   = s1_update_idx
 
   val wrbypass_idxs = Reg(Vec(nWrBypassEntries, UInt(log2Ceil(nSets).W)))
-  val wrbypass      = Reg(Vec(nWrBypassEntries, Vec(bankWidth, UInt(2.W))))
+  val wrbypass      = Reg(Vec(nWrBypassEntries, Vec(BPBankWidth, UInt(2.W))))
   val wrbypass_enq_idx = RegInit(0.U(log2Ceil(nWrBypassEntries).W))
 
   val wrbypass_hits = VecInit((0 until nWrBypassEntries) map { i =>
@@ -80,7 +80,7 @@ class BIMBranchPredictorBank(params: BoomBIMParams = BoomBIMParams())(implicit p
 
 
 
-  for (w <- 0 until bankWidth) {
+  for (w <- 0 until BPBankWidth) {
     s1_update_wmask(w)         := false.B
     s1_update_wdata(w)         := DontCare
 
@@ -109,8 +109,8 @@ class BIMBranchPredictorBank(params: BoomBIMParams = BoomBIMParams())(implicit p
   when (doing_reset || (s1_update.valid && s1_update.bits.is_commit_update)) {
     data.write(
       Mux(doing_reset, reset_idx, s1_update_index),
-      Mux(doing_reset, VecInit(Seq.fill(bankWidth) { 2.U }), s1_update_wdata),
-      Mux(doing_reset, (~(0.U(bankWidth.W))), s1_update_wmask.asUInt).asBools
+      Mux(doing_reset, VecInit(Seq.fill(BPBankWidth) { 2.U }), s1_update_wdata),
+      Mux(doing_reset, (~(0.U(BPBankWidth.W))), s1_update_wmask.asUInt).asBools
     )
   }
   when (s1_update_wmask.reduce(_||_) && s1_update.valid && s1_update.bits.is_commit_update) {
@@ -123,7 +123,7 @@ class BIMBranchPredictorBank(params: BoomBIMParams = BoomBIMParams())(implicit p
     }
   }
 
-  for (w <- 0 until bankWidth) {
+  for (w <- 0 until BPBankWidth) {
     io.resp.f2(w).taken := s2_resp(w)
     io.resp.f3(w).taken := RegNext(io.resp.f2(w).taken)
   }

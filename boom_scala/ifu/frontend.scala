@@ -58,10 +58,10 @@ class GlobalHistory(implicit p: Parameters) extends BoomBundle()(p)
   val ras_idx = UInt(log2Ceil(nRasEntries).W)
 
   def histories(bank: Int) = {
-    if (nBanks == 1) {
+    if (nBPBanks == 1) {
       old_history
     } else {
-      require(nBanks == 2)
+      require(nBPBanks == 2)
       if (bank == 0) {
         old_history
       } else {
@@ -91,7 +91,7 @@ class GlobalHistory(implicit p: Parameters) extends BoomBundle()(p)
                                             MaskLower(cfi_idx_oh) & ~Mux(cfi_is_br && cfi_taken, cfi_idx_oh, 0.U(fetchWidth.W)),
                                             ~(0.U(fetchWidth.W)))
 
-    if (nBanks == 1) {
+    if (nBPBanks == 1) {
       // In the single bank case every bank sees the history including the previous bank
       new_history := DontCare
       new_history.current_saw_branch_not_taken := false.B
@@ -102,10 +102,10 @@ class GlobalHistory(implicit p: Parameters) extends BoomBundle()(p)
     } else {
       // In the two bank case every bank ignore the history added by the previous bank
       val base = histories(1)
-      val cfi_in_bank_0 = cfi_valid && cfi_taken && cfi_idx_fixed < bankWidth.U
+      val cfi_in_bank_0 = cfi_valid && cfi_taken && cfi_idx_fixed < BPBankWidth.U
       val ignore_second_bank = cfi_in_bank_0 || mayNotBeDualBanked(addr)
 
-      val first_bank_saw_not_taken = not_taken_branches(bankWidth-1,0) =/= 0.U || current_saw_branch_not_taken
+      val first_bank_saw_not_taken = not_taken_branches(BPBankWidth - 1,0) =/= 0.U || current_saw_branch_not_taken
       new_history.current_saw_branch_not_taken := false.B
       when (ignore_second_bank) {
         new_history.old_history := histories(1)
@@ -116,7 +116,7 @@ class GlobalHistory(implicit p: Parameters) extends BoomBundle()(p)
                                    Mux(first_bank_saw_not_taken                               , histories(1) << 1,
                                                                                                 histories(1)))
 
-        new_history.new_saw_branch_not_taken := not_taken_branches(fetchWidth-1,bankWidth) =/= 0.U
+        new_history.new_saw_branch_not_taken := not_taken_branches(fetchWidth-1, BPBankWidth) =/= 0.U
         new_history.new_saw_branch_taken     := cfi_valid && cfi_taken && cfi_is_br && !cfi_in_bank_0
 
       }
@@ -135,6 +135,10 @@ trait HasBoomFrontendParameters extends HasL1ICacheParameters
 {
   // How many banks does the ICache use?
   val nBanks = if (cacheParams.fetchBytes <= 8) 1 else 2
+
+  val nBPBanks = if (cacheParams.fetchBytes <= 8) 1 else 2
+
+  val BPBankWidth = fetchWidth / nBPBanks
   // How many bytes wide is a bank?
   val bankBytes = fetchBytes/nBanks
 
@@ -238,7 +242,7 @@ class FetchBundle(implicit p: Parameters) extends BoomBundle
   val br_mask       = UInt(fetchWidth.W)
 
   val ghist         = new GlobalHistory
-  val lhist         = Vec(nBanks, UInt(localHistoryLength.W))
+  val lhist         = Vec(nBPBanks, UInt(localHistoryLength.W))
 
   val xcpt_pf_if    = Bool() // I-TLB miss (instruction fetch fault).
   val xcpt_ae_if    = Bool() // Access exception.
@@ -249,7 +253,7 @@ class FetchBundle(implicit p: Parameters) extends BoomBundle
   val end_half      = Valid(UInt(16.W))
 
 
-  val bpd_meta      = Vec(nBanks, UInt())
+  val bpd_meta      = Vec(nBPBanks, UInt())
 
   // Source of the prediction from this bundle
   val fsrc    = UInt(BSRC_SZ.W)

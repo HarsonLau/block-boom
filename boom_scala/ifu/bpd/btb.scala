@@ -62,24 +62,24 @@ class BTBBranchPredictorBank(params: BoomBTBParams = BoomBTBParams())(implicit p
   reset_idx := reset_idx + doing_reset
   when (reset_idx === (nSets-1).U) { doing_reset := false.B }
 
-  val meta     = Seq.fill(nWays) { SyncReadMem(nSets, Vec(bankWidth, UInt(btbMetaSz.W))) }
-  val btb      = Seq.fill(nWays) { SyncReadMem(nSets, Vec(bankWidth, UInt(btbEntrySz.W))) }
+  val meta     = Seq.fill(nWays) { SyncReadMem(nSets, Vec(BPBankWidth, UInt(btbMetaSz.W))) }
+  val btb      = Seq.fill(nWays) { SyncReadMem(nSets, Vec(BPBankWidth, UInt(btbEntrySz.W))) }
   val ebtb     = SyncReadMem(extendedNSets, UInt(vaddrBitsExtended.W))
 
   val mems = (((0 until nWays) map ({w:Int => Seq(
-    (f"btb_meta_way$w", nSets, bankWidth * btbMetaSz),
-    (f"btb_data_way$w", nSets, bankWidth * btbEntrySz))})).flatten ++ Seq(("ebtb", extendedNSets, vaddrBitsExtended)))
+    (f"btb_meta_way$w", nSets, BPBankWidth * btbMetaSz),
+    (f"btb_data_way$w", nSets, BPBankWidth * btbEntrySz))})).flatten ++ Seq(("ebtb", extendedNSets, vaddrBitsExtended)))
 
   val s1_req_rbtb  = VecInit(btb.map { b => VecInit(b.read(s0_idx , s0_valid).map(_.asTypeOf(new BTBEntry))) })
   val s1_req_rmeta = VecInit(meta.map { m => VecInit(m.read(s0_idx, s0_valid).map(_.asTypeOf(new BTBMeta))) })
   val s1_req_rebtb = ebtb.read(s0_idx, s0_valid)
   val s1_req_tag   = s1_idx >> log2Ceil(nSets)
 
-  val s1_resp   = Wire(Vec(bankWidth, Valid(UInt(vaddrBitsExtended.W))))
-  val s1_is_br  = Wire(Vec(bankWidth, Bool()))
-  val s1_is_jal = Wire(Vec(bankWidth, Bool()))
+  val s1_resp   = Wire(Vec(BPBankWidth, Valid(UInt(vaddrBitsExtended.W))))
+  val s1_is_br  = Wire(Vec(BPBankWidth, Bool()))
+  val s1_is_jal = Wire(Vec(BPBankWidth, Bool()))
 
-  val s1_hit_ohs = VecInit((0 until bankWidth) map { i =>
+  val s1_hit_ohs = VecInit((0 until BPBankWidth) map { i =>
     VecInit((0 until nWays) map { w =>
       s1_req_rmeta(w)(i).tag === s1_req_tag(tagSz-1,0)
     })
@@ -87,7 +87,7 @@ class BTBBranchPredictorBank(params: BoomBTBParams = BoomBTBParams())(implicit p
   val s1_hits     = s1_hit_ohs.map { oh => oh.reduce(_||_) }
   val s1_hit_ways = s1_hit_ohs.map { oh => PriorityEncoder(oh) }
 
-  for (w <- 0 until bankWidth) {
+  for (w <- 0 until BPBankWidth) {
     val entry_meta = s1_req_rmeta(s1_hit_ways(w))(w)
     val entry_btb  = s1_req_rbtb(s1_hit_ways(w))(w)
     s1_resp(w).valid := !doing_reset && s1_valid && s1_hits(w)
@@ -149,16 +149,16 @@ class BTBBranchPredictorBank(params: BoomBTBParams = BoomBTBParams())(implicit p
   s1_update_wbtb_data.extended := offset_is_extended
   s1_update_wbtb_data.offset   := new_offset_value
   val s1_update_wbtb_mask = (UIntToOH(s1_update_cfi_idx) &
-    Fill(bankWidth, s1_update.bits.cfi_idx.valid && s1_update.valid && s1_update.bits.cfi_taken && s1_update.bits.is_commit_update))
+    Fill(BPBankWidth, s1_update.bits.cfi_idx.valid && s1_update.valid && s1_update.bits.cfi_taken && s1_update.bits.is_commit_update))
 
   val s1_update_wmeta_mask = ((s1_update_wbtb_mask | s1_update.bits.br_mask) &
-    (Fill(bankWidth, s1_update.valid && s1_update.bits.is_commit_update) |
-     (Fill(bankWidth, s1_update.valid) & s1_update.bits.btb_mispredicts)
+    (Fill(BPBankWidth, s1_update.valid && s1_update.bits.is_commit_update) |
+     (Fill(BPBankWidth, s1_update.valid) & s1_update.bits.btb_mispredicts)
     )
   )
-  val s1_update_wmeta_data = Wire(Vec(bankWidth, new BTBMeta))
+  val s1_update_wmeta_data = Wire(Vec(BPBankWidth, new BTBMeta))
 
-  for (w <- 0 until bankWidth) {
+  for (w <- 0 until BPBankWidth) {
     s1_update_wmeta_data(w).tag     := Mux(s1_update.bits.btb_mispredicts(w), 0.U, s1_update_idx >> log2Ceil(nSets))
     s1_update_wmeta_data(w).is_br   := s1_update.bits.br_mask(w)
   }
@@ -170,10 +170,10 @@ class BTBBranchPredictorBank(params: BoomBTBParams = BoomBTBParams())(implicit p
           reset_idx,
           s1_update_idx),
         Mux(doing_reset,
-          VecInit(Seq.fill(bankWidth) { 0.U(btbEntrySz.W) }),
-          VecInit(Seq.fill(bankWidth) { s1_update_wbtb_data.asUInt })),
+          VecInit(Seq.fill(BPBankWidth) { 0.U(btbEntrySz.W) }),
+          VecInit(Seq.fill(BPBankWidth) { s1_update_wbtb_data.asUInt })),
         Mux(doing_reset,
-          (~(0.U(bankWidth.W))),
+          (~(0.U(BPBankWidth.W))),
           s1_update_wbtb_mask).asBools
       )
       meta(w).write(
@@ -181,10 +181,10 @@ class BTBBranchPredictorBank(params: BoomBTBParams = BoomBTBParams())(implicit p
           reset_idx,
           s1_update_idx),
         Mux(doing_reset,
-          VecInit(Seq.fill(bankWidth) { 0.U(btbMetaSz.W) }),
+          VecInit(Seq.fill(BPBankWidth) { 0.U(btbMetaSz.W) }),
           VecInit(s1_update_wmeta_data.map(_.asUInt))),
         Mux(doing_reset,
-          (~(0.U(bankWidth.W))),
+          (~(0.U(BPBankWidth.W))),
           s1_update_wmeta_mask).asBools
       )
 
