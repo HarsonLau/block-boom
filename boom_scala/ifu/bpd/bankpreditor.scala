@@ -250,6 +250,7 @@ class BlockBranchPredictor(implicit p:Parameters) extends BoomModule()(p)
       val f1 = new BlockBranchPredictionBundle
       val f2 = new BlockBranchPredictionBundle
       val f3 = new BlockBranchPredictionBundle
+      val ftb_entry = new FTBEntry
     })
 
     val f3_fire = Input(Bool())
@@ -257,5 +258,7 @@ class BlockBranchPredictor(implicit p:Parameters) extends BoomModule()(p)
     // Update
     val update = Input(Valid(new BlockBranchPredictionUpdate))
   })
+
+  io.resp.ftb_entry:=DontCare
 
 }

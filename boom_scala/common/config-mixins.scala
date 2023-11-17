@@ -485,15 +485,22 @@ class WithBTBBPD extends Config((site, here, up) => {
       localHistoryLength = 1,
       localHistoryNSets = 0,
       branchPredictor = ((resp_in: BranchPredictionBankResponse, p: Parameters) => {
-        // gshare is just variant of TAGE with 1 table
-        val btb = Module(new BTBBranchPredictorBank()(p))
-        val bim = Module(new BIMBranchPredictorBank()(p))
-        val preds = Seq(bim, btb)
+        // val loop = Module(new LoopBranchPredictorBank()(p))
+        // val tage = Module(new TageBranchPredictorBank()(p))
+        // val btb = Module(new BTBBranchPredictorBank()(p))
+        // val bim = Module(new BIMBranchPredictorBank()(p))
+        val ubtb = Module(new FAMicroBTBBranchPredictorBank()(p))
+        val preds = Seq(ubtb)
         preds.map(_.io := DontCare)
 
-        bim.io.resp_in(0)  := resp_in
-        btb.io.resp_in(0)  := bim.io.resp
-        (preds, btb.io.resp)
+        ubtb.io.resp_in(0)  := resp_in
+        // bim.io.resp_in(0)   := ubtb.io.resp
+        // btb.io.resp_in(0)   := bim.io.resp
+        // tage.io.resp_in(0)  := btb.io.resp
+        // loop.io.resp_in(0)  := tage.io.resp
+
+        (preds, ubtb.io.resp)
+        // gshare is just variant of TAGE with 1 table
       })
     )))
     case other => other
