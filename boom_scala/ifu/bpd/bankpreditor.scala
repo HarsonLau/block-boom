@@ -39,7 +39,7 @@ with HasBoomFTBParameters
   val slot_valids = Vec(totalSlot, Bool())
 
   val targets = Vec(totalSlot, UInt(vaddrBitsExtended.W))
-  val jalr_target = UInt(vaddrBitsExtended.W) // special path for indirect predictors
+  //val jalr_target = UInt(vaddrBitsExtended.W) // special path for indirect predictors
   val offsets = Vec(totalSlot, UInt(log2Ceil(predictWidth).W))
   val fallThroughAddr = UInt(vaddrBitsExtended.W)
   val fallThroughErr = Bool()

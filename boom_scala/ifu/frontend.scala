@@ -255,6 +255,8 @@ class FetchBundle(implicit p: Parameters) extends BoomBundle
   val fsrc    = UInt(BSRC_SZ.W)
   // Source of the prediction to this bundle
   val tsrc    = UInt(BSRC_SZ.W)
+  //TODO add FTB Entry here to support FTB
+  val ftb_entry = new FTBEntry
 }
 
 
@@ -396,7 +398,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   icache.io.req.bits.addr := s0_vpc
 
   bpd.io.f0_req.valid      := s0_valid
-  bpd.io.f0_req.bits.pc    := s0_vpc
+  bpd.io.f0_req.bits.pc    := s0_vpc // The branch predictor is requested using the actual PC
   bpd.io.f0_req.bits.ghist := s0_ghist
 
   // --------------------------------------------------------
@@ -610,6 +612,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   f3_fetch_bundle.fsrc := f3_imemresp.fsrc
   f3_fetch_bundle.tsrc := f3_imemresp.tsrc
   f3_fetch_bundle.shadowed_mask := f3_shadowed_mask
+  f3_fetch_bundle.ftb_entry := 0.U.asTypeOf(new FTBEntry) // TODO: connect ftb entry here
 
   // Tracks trailing 16b of previous fetch packet
   val f3_prev_half    = Reg(UInt(16.W))
@@ -867,7 +870,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   }
 
   // When f3 finds a btb mispredict, queue up a bpd correction update
-  val f4_btb_corrections = Module(new Queue(new BranchPredictionUpdate, 2))
+  val f4_btb_corrections = Module(new Queue(new BranchPredictionUpdate, 2)) // TODO: add FTB support here
   f4_btb_corrections.io.enq.valid := f3.io.deq.fire() && f3_btb_mispredicts.reduce(_||_) && enableBTBFastRepair.B
   f4_btb_corrections.io.enq.bits  := DontCare
   f4_btb_corrections.io.enq.bits.is_mispredict_update := false.B
@@ -934,7 +937,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
 
   f4_ready := f4.io.enq.ready
   f4.io.enq.valid := f3.io.deq.valid && !f3_clear
-  f4.io.enq.bits  := f3_fetch_bundle
+  f4.io.enq.bits  := f3_fetch_bundle // the fetch bundle is passed down here
   f4.io.deq.ready := fb.io.enq.ready && ftq.io.enq.ready && !f4_delay
 
   fb.io.enq.valid := f4.io.deq.valid && ftq.io.enq.ready && !f4_delay
