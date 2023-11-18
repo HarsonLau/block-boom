@@ -24,6 +24,10 @@ def process_infos(startinfo, eventinfos):
     #eventinfos.append(cal_fraction(eventinfos[36],eventinfos[50],"tage_jalr_misp_rate"))
     #eventinfos.append(cal_fraction(eventinfos[35],eventinfos[50],"tage_jalr_hit_rate"))
     eventinfos.append(cal_fraction(eventinfos[32],eventinfos[31],"tage_br_misp/hit"))
+
+    eventinfos.append(cal_fraction(eventinfos[57], eventinfos[0], "fetch_buffer_empty_rate"))
+
+    eventinfos.extend(cal_percentage(eventinfos[59:67]))
     return []
 
 

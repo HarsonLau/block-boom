@@ -57,7 +57,8 @@ if __name__ == "__main__":
 
     hash2config = {
     'd63a7e6a7b8556f519bb0f482728c7018542622e':'base',
-    'dual':'dualbank'
+    'dual':'dualbank',
+    'single' : 'singlebank'
     # 'b8cdcb02d0cb4efec580941a0a8a122c73ce3eee':'6-2048-9',
     # '9f8a97e32339da8ae24358b269b6072cdc438d9e':'6-1024-9',
     # '948eab349b4f1fd15eb4251997f276ead74779a1':'6-512-9',
@@ -77,11 +78,16 @@ if __name__ == "__main__":
 
     whitelist=["exe_misp_MPKI","user_ipc" ,"tage_br_misp_rate" ,"tage_br_hit_rate" ,"tage_jalr_misp_rate" ,"tage_jalr_hit_rate" ,"tage_br_misp/hit"]
     
+    fetch_buffer_percs = ['fetch_buffer_1_8_perc','fetch_buffer_2_8_perc','fetch_buffer_3_8_perc','fetch_buffer_4_8_perc','fetch_buffer_5_8_perc','fetch_buffer_6_8_perc','fetch_buffer_7_8_perc','fetch_buffer_8_8_perc']
+
+    whitelist.extend(fetch_buffer_percs)
+
+    whitelist.append("fetch_buffer_empty_rate")
     #open all the files in the input list, truncate the rows to the minimum length
     #skip all the rows with the first column not containing 'tage_br'
     #add a prefix to the first column to indicate the configuration
     #write the data to a file named by the benchmark name
-    with open(path_prefix+args.benchmark +'scalability'+ '_post.csv', 'w', newline='') as f:
+    with open(path_prefix+args.benchmark +'fetch_buffer_occupancy'+ '_post.csv', 'w', newline='') as f:
         writer = csv.writer(f)
         # write ,1,2,……,min_length to the first row
         header_row =[i for i in range(min_length)]
