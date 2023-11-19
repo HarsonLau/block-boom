@@ -134,6 +134,7 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
   val deq_ptr    = RegInit(0.U(idx_sz.W))
   val enq_ptr    = RegInit(1.U(idx_sz.W))
 
+  //TODO: why? enq_ptr ++ == bpd_ptr || (enq_ptr ++)++ == bpd_ptr
   val full = ((WrapInc(WrapInc(enq_ptr, num_entries), num_entries) === bpd_ptr) ||
               (WrapInc(enq_ptr, num_entries) === bpd_ptr))
 
@@ -152,9 +153,9 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
 
 
   // This register lets us initialize the ghist to 0
-  val prev_ghist = RegInit((0.U).asTypeOf(new GlobalHistory))
-  val prev_entry = RegInit((0.U).asTypeOf(new FTQBundle))
-  val prev_pc    = RegInit(0.U(vaddrBitsExtended.W))
+  val prev_ghist = RegInit((0.U).asTypeOf(new GlobalHistory)) // last enqueue's ghist
+  val prev_entry = RegInit((0.U).asTypeOf(new FTQBundle)) // last enqueue's entry
+  val prev_pc    = RegInit(0.U(vaddrBitsExtended.W)) // last enqueue's pc
   when (do_enq) {
 
     pcs(enq_ptr)           := io.enq.bits.pc
@@ -175,6 +176,7 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
     new_entry.br_mask       := io.enq.bits.br_mask & io.enq.bits.mask
     new_entry.start_bank    := bank(io.enq.bits.pc)
 
+    //TODO: current_saw_branch_not_taken ?
     val new_ghist = Mux(io.enq.bits.ghist.current_saw_branch_not_taken,
       io.enq.bits.ghist,
       prev_ghist.update(
@@ -189,6 +191,7 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
       )
     )
 
+    // write branch history here
     lhist.map( l => l.write(enq_ptr, io.enq.bits.lhist))
     ghist.map( g => g.write(enq_ptr, new_ghist))
     meta.write(enq_ptr, io.enq.bits.bpd_meta)
@@ -210,7 +213,7 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
     deq_ptr := io.deq.bits
   }
 
-  // This register avoids a spurious bpd update on the first fetch packet
+  // This register avoids a spurious(false) bpd update on the first fetch packet
   val first_empty = RegInit(true.B)
 
   // We can update the branch predictors when we know the target of the
@@ -229,9 +232,10 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
   val bpd_end_idx = Reg(UInt(log2Ceil(ftqSz).W))
   val bpd_repair_pc = Reg(UInt(vaddrBitsExtended.W))
 
+  // TODO: priority: redirect > repair > bpd_ptr
   val bpd_idx = Mux(io.redirect.valid, io.redirect.bits,
     Mux(bpd_update_repair || bpd_update_mispredict, bpd_repair_idx, bpd_ptr))
-  val bpd_entry = RegNext(ram(bpd_idx))
+  val bpd_entry = RegNext(ram(bpd_idx)) // read out the entry we're updating
   val bpd_ghist = ghist(0).read(bpd_idx, true.B)
   val bpd_lhist = if (useLHist) {
     lhist.get.read(bpd_idx, true.B)
@@ -282,11 +286,12 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
     io.bpdupdate.valid := (!first_empty &&
                            (bpd_entry.cfi_idx.valid || bpd_entry.br_mask =/= 0.U) &&
                            !(RegNext(do_repair_update) && !valid_repair))
+    // seems only loop predictor differentiates between mispredict and repair
     io.bpdupdate.bits.is_mispredict_update := RegNext(do_mispredict_update)
     io.bpdupdate.bits.is_repair_update     := RegNext(do_repair_update)
-    io.bpdupdate.bits.pc      := bpd_pc
+    io.bpdupdate.bits.pc      := bpd_pc   // seems like the fetch bundle's PC
     io.bpdupdate.bits.btb_mispredicts := 0.U
-    io.bpdupdate.bits.br_mask := Mux(bpd_entry.cfi_idx.valid,
+    io.bpdupdate.bits.br_mask := Mux(bpd_entry.cfi_idx.valid, // TODO: the exact Meaning 
       MaskLower(UIntToOH(cfi_idx)) & bpd_entry.br_mask, bpd_entry.br_mask)
     io.bpdupdate.bits.cfi_idx := bpd_entry.cfi_idx
     io.bpdupdate.bits.cfi_mispredicted := bpd_entry.cfi_mispredicted
@@ -314,6 +319,7 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
   val redirect_new_entry = WireInit(redirect_entry)
 
   when (io.redirect.valid) {
+    // when redirect happens, overwrite the entry behind the redirect entry
     enq_ptr    := WrapInc(io.redirect.bits, num_entries)
 
     when (io.brupdate.b2.mispredict) {
