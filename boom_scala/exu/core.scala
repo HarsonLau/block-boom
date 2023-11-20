@@ -630,6 +630,14 @@ class BoomCore(usingTrace: Boolean)(implicit p: Parameters) extends BoomModule
     event_counters.io.event_signals(64) :=  Mux(io.ifu.fetchbuffer_6_8, 1.U, 0.U)  //fetch buffer 6/8 full cycles
     event_counters.io.event_signals(65) :=  Mux(io.ifu.fetchbuffer_7_8, 1.U, 0.U)  //fetch buffer 7/8 full cycles
     event_counters.io.event_signals(66) :=  Mux(io.ifu.fetchbuffer_8_8, 1.U, 0.U)  //fetch buffer 8/8 full cycles
+    event_counters.io.event_signals(67) :=  Mux(io.ifu.flush_fetchbuffer_1_8, 1.U, 0.U)
+    event_counters.io.event_signals(68) :=  Mux(io.ifu.flush_fetchbuffer_2_8, 1.U, 0.U)
+    event_counters.io.event_signals(69) :=  Mux(io.ifu.flush_fetchbuffer_3_8, 1.U, 0.U)
+    event_counters.io.event_signals(70) :=  Mux(io.ifu.flush_fetchbuffer_4_8, 1.U, 0.U)
+    event_counters.io.event_signals(71) :=  Mux(io.ifu.flush_fetchbuffer_5_8, 1.U, 0.U)
+    event_counters.io.event_signals(72) :=  Mux(io.ifu.flush_fetchbuffer_6_8, 1.U, 0.U)
+    event_counters.io.event_signals(73) :=  Mux(io.ifu.flush_fetchbuffer_7_8, 1.U, 0.U)
+    event_counters.io.event_signals(74) :=  Mux(io.ifu.flush_fetchbuffer_8_8, 1.U, 0.U)
   }
   
 

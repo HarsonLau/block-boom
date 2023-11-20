@@ -310,6 +310,15 @@ class BoomFrontendIO(implicit p: Parameters) extends BoomBundle
   val fetchbuffer_6_8 = Input(Bool())
   val fetchbuffer_7_8 = Input(Bool())
   val fetchbuffer_8_8 = Input(Bool())
+
+  val flush_fetchbuffer_1_8 = Input(Bool())
+  val flush_fetchbuffer_2_8 = Input(Bool())
+  val flush_fetchbuffer_3_8 = Input(Bool())
+  val flush_fetchbuffer_4_8 = Input(Bool())
+  val flush_fetchbuffer_5_8 = Input(Bool())
+  val flush_fetchbuffer_6_8 = Input(Bool())
+  val flush_fetchbuffer_7_8 = Input(Bool())
+  val flush_fetchbuffer_8_8 = Input(Bool())
 }
 
 /**
@@ -904,6 +913,15 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   io.cpu.fetchbuffer_6_8 := fb.io.count <= (numFetchBufferEntries/4 * 3).U && fb.io.count > (numFetchBufferEntries/8 * 5).U
   io.cpu.fetchbuffer_7_8 := fb.io.count <= (numFetchBufferEntries/8 * 7).U && fb.io.count > (numFetchBufferEntries/8 * 6).U
   io.cpu.fetchbuffer_8_8 := fb.io.count <= (numFetchBufferEntries).U && fb.io.count > (numFetchBufferEntries/8 * 7).U 
+
+  io.cpu.flush_fetchbuffer_1_8 := fb.io.perf_clear && io.cpu.fetchbuffer_1_8
+  io.cpu.flush_fetchbuffer_2_8 := fb.io.perf_clear && io.cpu.fetchbuffer_2_8
+  io.cpu.flush_fetchbuffer_3_8 := fb.io.perf_clear && io.cpu.fetchbuffer_3_8
+  io.cpu.flush_fetchbuffer_4_8 := fb.io.perf_clear && io.cpu.fetchbuffer_4_8
+  io.cpu.flush_fetchbuffer_5_8 := fb.io.perf_clear && io.cpu.fetchbuffer_5_8
+  io.cpu.flush_fetchbuffer_6_8 := fb.io.perf_clear && io.cpu.fetchbuffer_6_8
+  io.cpu.flush_fetchbuffer_7_8 := fb.io.perf_clear && io.cpu.fetchbuffer_7_8
+  io.cpu.flush_fetchbuffer_8_8 := fb.io.perf_clear && io.cpu.fetchbuffer_8_8
 
 
   val ftq = Module(new FetchTargetQueue)

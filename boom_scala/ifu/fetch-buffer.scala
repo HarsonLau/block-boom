@@ -47,6 +47,7 @@ class FetchBuffer(implicit p: Parameters) extends BoomModule
     val deq = new DecoupledIO(new FetchBufferResp())
 
     val count = Output(UInt(log2Ceil(numEntries+1).W))
+    val perf_clear = Output(Bool())
     // Was the pipeline redirected? Clear/reset the fetchbuffer.
     val clear = Input(Bool())
   })
@@ -203,7 +204,10 @@ class FetchBuffer(implicit p: Parameters) extends BoomModule
   when (io.clear) {
     head := 1.U
     tail := 1.U
+    io.perf_clear := true.B
     maybe_full := false.B
+  }.otherwise{
+    io.perf_clear := false.B
   }
 
   // TODO Is this necessary?
