@@ -238,8 +238,14 @@ def drawplot(resname):
     # leftnames = ['fetch_buffer_1_8_perc','fetch_buffer_2_8_perc','fetch_buffer_3_8_perc','fetch_buffer_4_8_perc','fetch_buffer_5_8_perc','fetch_buffer_6_8_perc','fetch_buffer_7_8_perc','fetch_buffer_8_8_perc']
     # figs.append(draw_pecetage(xvalue, leftnames, [], xlabel, "Fetch Buffer Occupancy", ""))
 
-    leftnames = ['dualbank_fetch_buffer_empty_rate', 'singlebank_fetch_buffer_empty_rate']
-    figs.append(draw_lines(xvalue, leftnames, [], xlabel, "Fetch Buffer Empty Rate", ""))
+    leftnames = ['modified_boom_fetch_buffer_empty_rate', 'medium_boom_fetch_buffer_empty_rate']
+    figs.append(draw_pecetage(xvalue, leftnames, [], xlabel, "Fetch Buffer Empty Rate", ""))
+
+    # leftnames = ['dualbank_exe_misp_MPKI', 'singlebank_exe_misp_MPKI']
+    # figs.append(draw_lines(xvalue, leftnames, [], xlabel, "MPKI", ""))
+
+    # leftnames = ['dualbank_user_ipc', 'singlebank_user_ipc']
+    # figs.append(draw_lines(xvalue, leftnames, [], xlabel, "User IPC", ""))
     # frontend
     # leftnames = ['icache_miss_rate', 'itlb_miss_rate']
     # figs.append(draw_lines(xvalue, leftnames, ['user_ipc'], xlabel, "ICache & ITLB Miss Rate", "User IPC"))
