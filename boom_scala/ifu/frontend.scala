@@ -206,6 +206,17 @@ trait HasBoomFTBParameters extends HasBoomFrontendParameters{
   val instOffsetBits = log2Ceil(coreInstBytes) //corresponds to  `instOffsetBits` in XiangShan
 }
 
+class PredecodeBundle(implicit p: Parameters) extends BoomBundle with HasBoomFTBParameters{
+  val brMask = Vec(predictWidth, Bool())
+  val jmpInfo = Valid(Vec(3, Bool()))
+  val jmpOffset = UInt(log2Ceil(predictWidth).W)
+  val jalTarget = UInt(vaddrBitsExtended.W)
+  val rvcMask = Vec(predictWidth, Bool())
+  def hasJal  = jmpInfo.valid && !jmpInfo.bits(0)
+  def hasJalr = jmpInfo.valid && jmpInfo.bits(0)
+  def hasCall = jmpInfo.valid && jmpInfo.bits(1)
+  def hasRet  = jmpInfo.valid && jmpInfo.bits(2)
+}
 
 /**
  * Bundle passed into the FetchBuffer and used to combine multiple
@@ -227,6 +238,10 @@ class FetchBundle(implicit p: Parameters) extends BoomBundle
   val sfb_dests            = Vec(fetchWidth, UInt((1+log2Ceil(fetchBytes)).W))
   val shadowable_mask      = Vec(fetchWidth, Bool())
   val shadowed_mask        = Vec(fetchWidth, Bool())
+
+  // Information of the first unconditional jmp instruction
+  // Needed by FTB new entry gen
+  val pd = new PredecodeBundle
 
   val cfi_idx       = Valid(UInt(log2Ceil(fetchWidth).W))
   val cfi_type      = UInt(CFI_SZ.W)
@@ -786,6 +801,17 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
       last_inst(15,0),
       bank_prev_half)
   }
+
+  // for FTB
+  val f3_jmp_mask = f3_mask.asUInt & f3_cfi_types.map(t => t === CFI_JAL || t === CFI_JALR).asUInt 
+  val f3_jmp_idx = PriorityEncoder(f3_jmp_mask)
+  val f3_jmp_type = f3_cfi_types(f3_jmp_idx)
+  f3_fetch_bundle.pd.jmpInfo.valid := f3_jmp_mask.orR
+  f3_fetch_bundle.pd.jmpInfo.bits := VecInit(f3_jmp_type === CFI_JALR, f3_call_mask(f3_jmp_idx), f3_ret_mask(f3_jmp_idx))
+  f3_fetch_bundle.pd.brMask := f3_br_mask
+  f3_fetch_bundle.pd.jmpOffset := f3_jmp_idx
+  f3_fetch_bundle.pd.jalTarget := f3_targs(f3_jmp_idx)
+  f3_fetch_bundle.pd.rvcMask := f3_is_rvc
 
   f3_fetch_bundle.cfi_type      := f3_cfi_types(f3_fetch_bundle.cfi_idx.bits)
   f3_fetch_bundle.cfi_is_call   := f3_call_mask(f3_fetch_bundle.cfi_idx.bits)
