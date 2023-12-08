@@ -363,7 +363,7 @@ class BoomFrontendBundle(val outer: BoomFrontend) extends CoreBundle()(outer.p)
  */
 class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   with HasBoomCoreParameters
-  with HasBoomFrontendParameters
+  with HasBoomFTBParameters
 {
   val io = IO(new BoomFrontendBundle(outer))
   val io_reset_vector = outer.resetVectorSinkNode.bundle
@@ -996,6 +996,29 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     ras.io.write_idx   := ftq.io.ras_update_idx
     ras.io.write_addr  := ftq.io.ras_update_pc
   }
+
+  val ftbEntryGen = Module(new FTBEntryGen).io
+  ftbEntryGen.start_addr := 0.U
+  ftbEntryGen.old_entry := 0.U.asTypeOf(new FTBEntry)
+  ftbEntryGen.pd := 0.U.asTypeOf(new PredecodeBundle)
+  ftbEntryGen.cfiIndex.valid := false.B
+  ftbEntryGen.cfiIndex.bits := 0.U
+  ftbEntryGen.target := 0.U 
+  ftbEntryGen.hit := false.B
+  ftbEntryGen.mispredict_vec := VecInit(Seq.fill(predictWidth)(false.B))
+
+  ftbEntryGen.new_entry := DontCare
+  ftbEntryGen.new_br_insert_pos := DontCare
+  ftbEntryGen.taken_mask := DontCare
+  ftbEntryGen.jmp_taken := DontCare
+  ftbEntryGen.mispred_mask := DontCare
+
+  ftbEntryGen.is_init_entry := DontCare
+  ftbEntryGen.is_old_entry := DontCare
+  ftbEntryGen.is_new_br := DontCare
+  ftbEntryGen.is_jalr_target_modified := DontCare
+  ftbEntryGen.is_always_taken_modified := DontCare
+  ftbEntryGen.is_br_full := DontCare
 
 
   // -------------------------------------------------------
