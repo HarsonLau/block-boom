@@ -161,7 +161,7 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
   when (do_enq) {
 
     pcs(enq_ptr)           := io.enq.bits.pc
-    pds(enq_ptr)           := io.enq.bits.pd
+    pds(enq_ptr)           := io.enq.bits.pd // for FTB
 
     val new_entry = Wire(new FTQBundle)
 
@@ -247,6 +247,7 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
   }
   val bpd_meta  = meta.read(bpd_idx, true.B) // TODO fix these SRAMs
   val bpd_pc    = RegNext(pcs(bpd_idx))
+  val bpd_pd    = RegNext(pds(bpd_idx)) // for FTB
   val bpd_target = RegNext(pcs(WrapInc(bpd_idx, num_entries)))
 
   when (io.redirect.valid) {
@@ -305,6 +306,7 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
     io.bpdupdate.bits.ghist      := bpd_ghist
     io.bpdupdate.bits.lhist      := bpd_lhist
     io.bpdupdate.bits.meta       := bpd_meta
+    io.bpdupdate.bits.pd         := bpd_pd // for FTB
     
     // TODO: Add support for FTB update here
 

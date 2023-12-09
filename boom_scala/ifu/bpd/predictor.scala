@@ -81,6 +81,8 @@ class BranchPredictionUpdate(implicit p: Parameters) extends BoomBundle()(p)
   val target        = UInt(vaddrBitsExtended.W)
 
   val meta          = Vec(nBPBanks, UInt(bpdMaxMetaLength.W))
+
+  val pd = new PredecodeBundle
 }
 
 // A branch update to a single bank

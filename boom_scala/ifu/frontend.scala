@@ -910,6 +910,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   f4_btb_corrections.io.enq.bits.ghist                := f3_fetch_bundle.ghist
   f4_btb_corrections.io.enq.bits.lhist                := f3_fetch_bundle.lhist
   f4_btb_corrections.io.enq.bits.meta                 := f3_fetch_bundle.bpd_meta
+  f4_btb_corrections.io.enq.bits.pd                   := f3_fetch_bundle.pd
 
 
   // -------------------------------------------------------
@@ -998,12 +999,12 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   }
 
   val ftbEntryGen = Module(new FTBEntryGen).io
-  ftbEntryGen.start_addr := 0.U
+  ftbEntryGen.start_addr := bpd_update_arbiter.io.out.bits.pc
   ftbEntryGen.old_entry := 0.U.asTypeOf(new FTBEntry)
-  ftbEntryGen.pd := 0.U.asTypeOf(new PredecodeBundle)
-  ftbEntryGen.cfiIndex.valid := false.B
-  ftbEntryGen.cfiIndex.bits := 0.U
-  ftbEntryGen.target := 0.U 
+  ftbEntryGen.pd := bpd_update_arbiter.io.out.bits.pd
+  ftbEntryGen.cfiIndex.valid := bpd_update_arbiter.io.out.bits.cfi_idx.valid
+  ftbEntryGen.cfiIndex.bits := bpd_update_arbiter.io.out.bits.cfi_idx.bits
+  ftbEntryGen.target := bpd_update_arbiter.io.out.bits.target
   ftbEntryGen.hit := false.B
   ftbEntryGen.mispredict_vec := VecInit(Seq.fill(predictWidth)(false.B))
 
