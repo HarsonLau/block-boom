@@ -9,7 +9,7 @@ import freechips.rocketchip.tilelink._
 import freechips.rocketchip.util._
 
 import boom.common._
-import boom.util.{BoomCoreStringPrefix}
+import boom.util._
 
 import scala.math.min
 
@@ -270,20 +270,20 @@ class FTBEntry(implicit p: Parameters) extends BoomBundle with FTBParams with BP
     VecInit(brSlots.map(_.offset) :+ tailSlot.offset)
   }
 
-  // def display(cond: Bool): Unit = {
-  //   XSDebug(cond, p"-----------FTB entry----------- \n")
-  //   XSDebug(cond, p"v=${valid}\n")
-  //   for(i <- 0 until numBr) {
-  //     XSDebug(cond, p"[br$i]: v=${allSlotsForBr(i).valid}, offset=${allSlotsForBr(i).offset}," +
-  //       p"lower=${Hexadecimal(allSlotsForBr(i).lower)}\n")
-  //   }
-  //   XSDebug(cond, p"[tailSlot]: v=${tailSlot.valid}, offset=${tailSlot.offset}," +
-  //     p"lower=${Hexadecimal(tailSlot.lower)}, sharing=${tailSlot.sharing}}\n")
-  //   XSDebug(cond, p"pftAddr=${Hexadecimal(pftAddr)}, carry=$carry\n")
-  //   XSDebug(cond, p"isCall=$isCall, isRet=$isRet, isjalr=$isJalr\n")
-  //   XSDebug(cond, p"last_may_be_rvi_call=$last_may_be_rvi_call\n")
-  //   XSDebug(cond, p"------------------------------- \n")
-  // }
+  def display(cond: Bool): Unit = {
+    XSDebug(cond, p"-----------FTB entry----------- \n")
+    XSDebug(cond, p"v=${valid}\n")
+    for(i <- 0 until numBr) {
+      XSDebug(cond, p"[br$i]: v=${allSlotsForBr(i).valid}, offset=${allSlotsForBr(i).offset}," +
+        p"lower=${Hexadecimal(allSlotsForBr(i).lower)}\n")
+    }
+    XSDebug(cond, p"[tailSlot]: v=${tailSlot.valid}, offset=${tailSlot.offset}," +
+      p"lower=${Hexadecimal(tailSlot.lower)}, sharing=${tailSlot.sharing}}\n")
+    XSDebug(cond, p"pftAddr=${Hexadecimal(pftAddr)}, carry=$carry\n")
+    XSDebug(cond, p"isCall=$isCall, isRet=$isRet, isjalr=$isJalr\n")
+    XSDebug(cond, p"last_may_be_rvi_call=$last_may_be_rvi_call\n")
+    XSDebug(cond, p"------------------------------- \n")
+  }
 
 }
 

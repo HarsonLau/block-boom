@@ -1021,6 +1021,11 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   ftbEntryGen.is_always_taken_modified := DontCare
   ftbEntryGen.is_br_full := DontCare
 
+  val out_entry = ftbEntryGen.new_entry
+  out_entry.display(ftbEntryGen.cfiIndex.valid)
+
+  XSDebug(ftbEntryGen.cfiIndex.valid, p"fall thru: ${Hexadecimal(out_entry.getFallThrough(bpd_update_arbiter.io.out.bits.pc))}\n")
+
 
   // -------------------------------------------------------
   // **** To Core (F5) ****

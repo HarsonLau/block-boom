@@ -16,7 +16,7 @@ class FTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBPara
     val cfiIndex = Flipped(Valid(UInt(log2Ceil(predictWidth).W)))
     val target = Input(UInt(vaddrBitsExtended.W))
     val hit = Input(Bool())
-    val mispredict_vec = Input(Vec(predictWidth, Bool()))
+    val mispredict_vec = Input(Vec(predictWidth, Bool())) // seems this input does not affect the new FTB entry gen
 
     val new_entry = Output(new FTBEntry)
     val new_br_insert_pos = Output(Vec(numBr, Bool()))
@@ -60,6 +60,8 @@ class FTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBPara
   val cfi_is_jal = io.cfiIndex.bits === pd.jmpOffset && new_jmp_is_jal
   val cfi_is_jalr = io.cfiIndex.bits === pd.jmpOffset && new_jmp_is_jalr
 
+  // predictWidth = 4
+  // instOffsetBits = 1
   def carryPos = log2Ceil(predictWidth)+instOffsetBits
   def getLower(pc: UInt) = pc(carryPos-1, instOffsetBits)
   // if not hit, establish a new entry
@@ -83,8 +85,8 @@ class FTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBPara
   }
 
   //TODO: how's the jmpPft calculated?
-  val jmpPft = getLower(io.start_addr) +& pd.jmpOffset +& Mux(pd.rvcMask(pd.jmpOffset), 1.U, 2.U)
-  init_entry.pftAddr := Mux(entry_has_jmp && !last_jmp_rvi, jmpPft, getLower(io.start_addr))
+  val jmpPft = pd.jmpOffset +& Mux(pd.rvcMask(pd.jmpOffset), 1.U, 2.U)
+  init_entry.pftAddr := Mux(entry_has_jmp && !last_jmp_rvi, jmpPft, 0.U)// FTB： align to boundary
   init_entry.carry   := Mux(entry_has_jmp && !last_jmp_rvi, jmpPft(carryPos-instOffsetBits), true.B)
   init_entry.isJalr := new_jmp_is_jalr
   init_entry.isCall := new_jmp_is_call
@@ -146,8 +148,8 @@ class FTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBPara
         new_br_offset, oe.allSlotsForBr.last.offset)
 
     // set jmp to invalid
-    old_entry_modified.pftAddr := getLower(io.start_addr) + new_pft_offset
-    old_entry_modified.carry := (getLower(io.start_addr) +& new_pft_offset).head(1).asBool
+    old_entry_modified.pftAddr := new_pft_offset
+    old_entry_modified.carry := false.B // when the new pft is a br, carry cannot be true
     old_entry_modified.last_may_be_rvi_call := false.B
     old_entry_modified.isCall := false.B
     old_entry_modified.isRet := false.B
