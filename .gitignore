@@ -12,3 +12,5 @@ eval-tage.sh
 **__pycache__
 *template
 gen.sh
+*.log
+*.dump
