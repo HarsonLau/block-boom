@@ -107,10 +107,10 @@ sealed abstract class LogHelper(val logLevel: XSLogLevel){
 
   def apply(cond: Bool, fmt: String, data: Bits*)(implicit p: Parameters): Any =
     apply(cond, Printable.pack(fmt, data:_*))
-  def apply(cond: Bool, pable: Printable)(implicit p: Parameters): Any = apply(true, cond, pable)
+  def apply(cond: Bool, pable: Printable)(implicit p: Parameters): Any = apply(false, cond, pable)
   def apply(fmt: String, data: Bits*)(implicit p: Parameters): Any =
     apply(Printable.pack(fmt, data:_*))
-  def apply(pable: Printable)(implicit p: Parameters): Any = apply(true.B, pable)
+  def apply(pable: Printable)(implicit p: Parameters): Any = apply(false.B, pable)
   def apply(prefix: Boolean, cond: Bool, fmt: String, data: Bits*)(implicit p: Parameters): Any =
     apply(prefix, cond, Printable.pack(fmt, data:_*))
   def apply(prefix: Boolean, cond: Bool, pable: Printable)(implicit p: Parameters): Any ={

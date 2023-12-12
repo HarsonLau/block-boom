@@ -32,15 +32,6 @@ class FTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBPara
     val is_always_taken_modified = Output(Bool())
     val is_br_full = Output(Bool())
   })
-  when(io.cfiIndex.valid) {
-    assert(io.cfiIndex.bits < predictWidth.U)
-    printf("FTBEntryGen: start_addr: %x, cfiIndex: %x, target: %x, hit: %d, mispredict_vec: %b\n",
-      io.start_addr, io.cfiIndex.bits, io.target, io.hit, io.mispredict_vec.asUInt)
-
-    printf("Predecode Info: jmpInfo.valid: %d, jmpInfo.bits: %b, jmpOffset: %d, jalTarget: %x, brMask: %b, rvcMask: %b\n",
-      io.pd.jmpInfo.valid, io.pd.jmpInfo.bits.asUInt, io.pd.jmpOffset, io.pd.jalTarget, io.pd.brMask.asUInt, io.pd.rvcMask.asUInt )
-  }
-
   // no mispredictions detected at predecode
   val hit = io.hit
   val pd = io.pd

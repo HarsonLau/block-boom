@@ -216,6 +216,10 @@ class PredecodeBundle(implicit p: Parameters) extends BoomBundle with HasBoomFTB
   def hasJalr = jmpInfo.valid && jmpInfo.bits(0)
   def hasCall = jmpInfo.valid && jmpInfo.bits(1)
   def hasRet  = jmpInfo.valid && jmpInfo.bits(2)
+  
+  def display(cond: Bool): Unit = {
+    XSDebug(cond, p"Predecode: jmpInfo.valid: ${jmpInfo.valid}, jmpInfo.bits: ${Binary(jmpInfo.bits.asUInt)} jmpOffset: ${jmpOffset}, jalTarget: ${Hexadecimal(jalTarget)}, brMask: ${Binary(brMask.asUInt)}, rvcMask: ${Binary(rvcMask.asUInt)}\n")
+  }
 }
 
 /**
@@ -907,6 +911,9 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   f4_btb_corrections.io.enq.bits.is_repair_update     := false.B
   f4_btb_corrections.io.enq.bits.btb_mispredicts      := f3_btb_mispredicts.asUInt
   f4_btb_corrections.io.enq.bits.pc                   := f3_fetch_bundle.pc
+  f4_btb_corrections.io.enq.bits.cfi_is_br            := false.B
+  f4_btb_corrections.io.enq.bits.cfi_is_jal           := true.B
+  f4_btb_corrections.io.enq.bits.cfi_is_jalr          := false.B
   f4_btb_corrections.io.enq.bits.ghist                := f3_fetch_bundle.ghist
   f4_btb_corrections.io.enq.bits.lhist                := f3_fetch_bundle.lhist
   f4_btb_corrections.io.enq.bits.meta                 := f3_fetch_bundle.bpd_meta
@@ -997,6 +1004,8 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     ras.io.write_idx   := ftq.io.ras_update_idx
     ras.io.write_addr  := ftq.io.ras_update_pc
   }
+
+  bpd_update_arbiter.io.out.bits.ftb_display(bpd_update_arbiter.io.out.bits.cfi_idx.valid)
 
   val ftbEntryGen = Module(new FTBEntryGen).io
   ftbEntryGen.start_addr := bpd_update_arbiter.io.out.bits.pc
