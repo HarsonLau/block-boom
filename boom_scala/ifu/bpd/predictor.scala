@@ -86,11 +86,11 @@ class BranchPredictionUpdate(implicit p: Parameters) extends BoomBundle()(p)
 
   def ftb_display(cond : Bool):Unit= {
     XSDebug(cond, p"---BranchPredictionUpdate---\n")
-    XSDebug(cond, p"pc=0x${Hexadecimal(pc)} ")
+    XSDebug(cond, p"pc=0x${Hexadecimal(pc)}, ")
     XSDebug(cond, p"br_mask=${Binary(br_mask)}\n")
-    XSDebug(cond, p"[cfi_idx]: valid=${cfi_idx.valid} bits=${cfi_idx.bits.asUInt} ")
-    XSDebug(cond, p"cfi_taken=${cfi_taken} cfi_mispredicted=${cfi_mispredicted} cfi_is_br=${cfi_is_br} cfi_is_jal=${cfi_is_jal} cfi_is_jalr=${cfi_is_jalr}")
-    XSDebug(cond, p"target=0x${Hexadecimal(target)} \n")
+    XSDebug(cond, p"[cfi_idx]: valid=${cfi_idx.valid}, bits=${cfi_idx.bits.asUInt}\n")
+    XSDebug(cond, p"cfi_taken=${cfi_taken}, cfi_mispredicted=${cfi_mispredicted}, cfi_is_br=${cfi_is_br}, cfi_is_jal=${cfi_is_jal}, cfi_is_jalr=${cfi_is_jalr}\n")
+    XSDebug(cond, p"target=0x${Hexadecimal(target)}\n")
     pd.display(cond)
     XSDebug(cond, p"--------------------------------\n")
   }
