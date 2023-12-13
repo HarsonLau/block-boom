@@ -174,6 +174,14 @@ class FtbSlot(val offsetLen: Int, val subOffsetLen: Option[Int] = None)(implicit
     this.lower := ZeroExt(that.lower, this.offsetLen)
   }
 
+  def display(cond: Bool): Unit = {
+    XSDebug(cond, p"v=${valid}, offset=${offset}, lower=${lower}, tarStat=${tarStat}, sharing=${sharing}\n")
+  }
+
+  def display(cond : Bool , prefix : chisel3.Printable): Unit = {
+    XSDebug(cond, prefix+p"v=${valid}, offset=${offset}, lower=${lower}, tarStat=${tarStat}, sharing=${sharing}\n")
+  }
+
 }
 
 class FTBEntry(implicit p: Parameters) extends BoomBundle with FTBParams with BPUUtils{
@@ -274,14 +282,12 @@ class FTBEntry(implicit p: Parameters) extends BoomBundle with FTBParams with BP
     XSDebug(cond, p"-----------FTB entry----------- \n")
     XSDebug(cond, p"v=${valid}\n")
     for(i <- 0 until numBr) {
-      XSDebug(cond, p"[br$i]: v=${allSlotsForBr(i).valid}, offset=${allSlotsForBr(i).offset}," +
-        p"lower=${Hexadecimal(allSlotsForBr(i).lower)}\n")
+      allSlotsForBr(i).display(cond, p"[br$i]: ")
     }
-    XSDebug(cond, p"[tailSlot]: v=${tailSlot.valid}, offset=${tailSlot.offset}," +
-      p"lower=${Hexadecimal(tailSlot.lower)}, sharing=${tailSlot.sharing}\n")
+    tailSlot.display(cond, p"[tailSlot]: ")
     XSDebug(cond, p"pftAddr=${Hexadecimal(pftAddr)}, carry=$carry\n")
-    XSDebug(cond, p"isCall=$isCall, isRet=$isRet, isjalr=$isJalr\n")
-    XSDebug(cond, p"last_may_be_rvi_call=$last_may_be_rvi_call\n")
+    XSDebug(cond, p"isCall=$isCall, isRet=$isRet, isjalr=$isJalr, last_may_be_rvi_call=$last_may_be_rvi_call\n")
+    XSDebug(cond, p"always_taken=${Binary(always_taken.asUInt)}\n")
     XSDebug(cond, p"------------------------------- \n")
   }
 
