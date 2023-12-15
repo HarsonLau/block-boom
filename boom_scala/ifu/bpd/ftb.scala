@@ -278,17 +278,27 @@ class FTBEntry(implicit p: Parameters) extends BoomBundle with FTBParams with BP
     VecInit(brSlots.map(_.offset) :+ tailSlot.offset)
   }
 
-  def display(cond: Bool): Unit = {
-    XSDebug(cond, p"-----------FTB entry----------- \n")
-    XSDebug(cond, p"v=${valid}\n")
-    for(i <- 0 until numBr) {
-      allSlotsForBr(i).display(cond, p"[br$i]: ")
+  def display(cond: Bool, decimal: Boolean = true): Unit = {
+    // XSDebug(cond, p"-----------FTB entry----------- \n")
+    val prefix = p"FTB Entry:"
+    XSDebug(cond, prefix + p"v=${valid}\n")
+    for(i <- 0 until numBrSlot) {
+      allSlotsForBr(i).display(cond, prefix+p"[br$i]: ")
     }
-    tailSlot.display(cond, p"[tailSlot]: ")
-    XSDebug(cond, p"pftAddr=${Hexadecimal(pftAddr)}, carry=$carry\n")
-    XSDebug(cond, p"isCall=$isCall, isRet=$isRet, isjalr=$isJalr, last_may_be_rvi_call=$last_may_be_rvi_call\n")
-    XSDebug(cond, p"always_taken=${Binary(always_taken.asUInt)}\n")
-    XSDebug(cond, p"------------------------------- \n")
+    tailSlot.display(cond,prefix+ p"[tailSlot]: ")
+    if(decimal) {
+      XSDebug(cond,prefix+ p"pftAddr=${pftAddr}, carry=$carry\n")
+    } else {
+      XSDebug(cond,prefix+ p"pftAddr=${Hexadecimal(pftAddr)}, carry=$carry\n")
+    }
+    XSDebug(cond,prefix+ p"isCall=$isCall, isRet=$isRet, isjalr=$isJalr, last_may_be_rvi_call=$last_may_be_rvi_call\n")
+    if(decimal){
+      XSDebug(cond,prefix+ p"always_taken=${always_taken.asUInt}\n")
+    }
+    else{
+      XSDebug(cond,prefix+ p"always_taken=${Binary(always_taken.asUInt)}\n")
+    }
+    // XSDebug(cond, p"------------------------------- \n")
   }
 
 }
@@ -296,10 +306,15 @@ class FTBEntry(implicit p: Parameters) extends BoomBundle with FTBParams with BP
 class FTBEntryWithTag(implicit p: Parameters) extends BoomBundle with FTBParams {
   val entry = new FTBEntry
   val tag = UInt(tagSize.W)
-  // def display(cond: Bool): Unit = {
-  //   entry.display(cond)
-  //   XSDebug(cond, p"tag is ${Hexadecimal(tag)}\n------------------------------- \n")
-  // }
+  def display(cond: Bool, decimal: Boolean = false): Unit = {
+    entry.display(cond)
+    if(decimal){
+      XSDebug(cond, p"ftb entry tag: ${tag}\n")
+    }
+    else{
+      XSDebug(cond, p"ftb entry tag: ${Hexadecimal(tag)}\n")
+    }
+  }
 }
 
 class FTBMeta(implicit p: Parameters) extends BoomBundle with FTBParams {

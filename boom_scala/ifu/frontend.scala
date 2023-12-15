@@ -217,8 +217,13 @@ class PredecodeBundle(implicit p: Parameters) extends BoomBundle with HasBoomFTB
   def hasCall = jmpInfo.valid && jmpInfo.bits(1)
   def hasRet  = jmpInfo.valid && jmpInfo.bits(2)
   
-  def display(cond: Bool): Unit = {
-    XSDebug(cond, p"Predecode: jmpInfo.valid: ${jmpInfo.valid}, jmpInfo.bits: ${Binary(jmpInfo.bits.asUInt)} jmpOffset: ${jmpOffset}, jalTarget: ${Hexadecimal(jalTarget)}, brMask: ${Binary(brMask.asUInt)}, rvcMask: ${Binary(rvcMask.asUInt)}\n")
+  def display(cond: Bool, decimal: Boolean = true, _prefix:chisel3.Printable = ""): Unit = {
+    if(decimal){
+      XSDebug(cond, _prefix + p"Predecode: jmpInfo.valid: ${jmpInfo.valid}, jmpInfo.bits: ${jmpInfo.bits.asUInt}, jmpOffset: ${jmpOffset}, jalTarget: ${jalTarget}, brMask: ${brMask.asUInt}, rvcMask: ${rvcMask.asUInt}\n")
+    }
+    else{
+      XSDebug(cond, _prefix + p"Predecode: jmpInfo.valid: ${jmpInfo.valid}, jmpInfo.bits: ${Binary(jmpInfo.bits.asUInt)} jmpOffset: ${jmpOffset}, jalTarget: ${Hexadecimal(jalTarget)}, brMask: ${Binary(brMask.asUInt)}, rvcMask: ${Binary(rvcMask.asUInt)}\n")
+    }
   }
 }
 
@@ -1005,7 +1010,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     ras.io.write_addr  := ftq.io.ras_update_pc
   }
 
-  bpd_update_arbiter.io.out.bits.ftb_display(bpd_update_arbiter.io.out.bits.cfi_idx.valid)
+  bpd_update_arbiter.io.out.bits.display(bpd_update_arbiter.io.out.bits.cfi_idx.valid)
 
   val ftbEntryGen = Module(new FTBEntryGen).io
   ftbEntryGen.start_addr := bpd_update_arbiter.io.out.bits.pc
@@ -1033,7 +1038,8 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   val out_entry = ftbEntryGen.new_entry
   out_entry.display(ftbEntryGen.cfiIndex.valid)
 
-  XSDebug(ftbEntryGen.cfiIndex.valid, p"fall thru: ${Hexadecimal(out_entry.getFallThrough(bpd_update_arbiter.io.out.bits.pc))}\n")
+  // XSDebug(ftbEntryGen.cfiIndex.valid, p"fall thru: ${Hexadecimal(out_entry.getFallThrough(bpd_update_arbiter.io.out.bits.pc))}\n")
+  XSDebug(ftbEntryGen.cfiIndex.valid, p"FTB Entry: fall-thru: ${out_entry.getFallThrough(bpd_update_arbiter.io.out.bits.pc)}\n")
 
 
   // -------------------------------------------------------
