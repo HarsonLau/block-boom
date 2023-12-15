@@ -179,7 +179,7 @@ class FtbSlot(val offsetLen: Int, val subOffsetLen: Option[Int] = None)(implicit
   }
 
   def display(cond : Bool , prefix : chisel3.Printable): Unit = {
-    XSDebug(cond, prefix+p"v=${valid}, offset=${offset}, lower=${lower}, tarStat=${tarStat}, sharing=${sharing}\n")
+    XSDebug(cond, prefix+p"v: ${valid} offset: ${offset} lower: ${lower} tarStat: ${tarStat} sharing: ${sharing}\n")
   }
 
 }
@@ -280,23 +280,23 @@ class FTBEntry(implicit p: Parameters) extends BoomBundle with FTBParams with BP
 
   def display(cond: Bool, decimal: Boolean = true): Unit = {
     // XSDebug(cond, p"-----------FTB entry----------- \n")
-    val prefix = p"FTB Entry:"
-    XSDebug(cond, prefix + p"v=${valid}\n")
+    val prefix = p"FTBEntry:"
+    XSDebug(cond, prefix + p"v: ${valid}\n")
     for(i <- 0 until numBrSlot) {
-      allSlotsForBr(i).display(cond, prefix+p"[br$i]: ")
+      allSlotsForBr(i).display(cond, prefix)
     }
-    tailSlot.display(cond,prefix+ p"[tailSlot]: ")
+    tailSlot.display(cond,prefix)
     if(decimal) {
-      XSDebug(cond,prefix+ p"pftAddr=${pftAddr}, carry=$carry\n")
+      XSDebug(cond,prefix+ p"pftAddr: ${pftAddr} carry: $carry\n")
     } else {
-      XSDebug(cond,prefix+ p"pftAddr=${Hexadecimal(pftAddr)}, carry=$carry\n")
+      XSDebug(cond,prefix+ p"pftAddr: ${Hexadecimal(pftAddr)}, carry: $carry\n")
     }
-    XSDebug(cond,prefix+ p"isCall=$isCall, isRet=$isRet, isjalr=$isJalr, last_may_be_rvi_call=$last_may_be_rvi_call\n")
+    XSDebug(cond,prefix+ p"isCall: $isCall isRet: $isRet isjalr: $isJalr last_may_be_rvi_call: $last_may_be_rvi_call\n")
     if(decimal){
-      XSDebug(cond,prefix+ p"always_taken=${always_taken.asUInt}\n")
+      XSDebug(cond,prefix+ p"always_taken: ${always_taken.asUInt}\n")
     }
     else{
-      XSDebug(cond,prefix+ p"always_taken=${Binary(always_taken.asUInt)}\n")
+      XSDebug(cond,prefix+ p"always_taken: ${Binary(always_taken.asUInt)}\n")
     }
     // XSDebug(cond, p"------------------------------- \n")
   }

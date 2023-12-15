@@ -219,7 +219,7 @@ class PredecodeBundle(implicit p: Parameters) extends BoomBundle with HasBoomFTB
   
   def display(cond: Bool, decimal: Boolean = true, _prefix:chisel3.Printable = ""): Unit = {
     if(decimal){
-      XSDebug(cond, _prefix + p"Predecode: jmpInfo.valid: ${jmpInfo.valid}, jmpInfo.bits: ${jmpInfo.bits.asUInt}, jmpOffset: ${jmpOffset}, jalTarget: ${jalTarget}, brMask: ${brMask.asUInt}, rvcMask: ${rvcMask.asUInt}\n")
+      XSDebug(cond, _prefix + p"Predecode: jmpInfo.valid: ${jmpInfo.valid} jmpInfo.bits: ${jmpInfo.bits.asUInt} jmpOffset: ${jmpOffset} jalTarget: ${jalTarget} brMask: ${brMask.asUInt} rvcMask: ${rvcMask.asUInt}\n")
     }
     else{
       XSDebug(cond, _prefix + p"Predecode: jmpInfo.valid: ${jmpInfo.valid}, jmpInfo.bits: ${Binary(jmpInfo.bits.asUInt)} jmpOffset: ${jmpOffset}, jalTarget: ${Hexadecimal(jalTarget)}, brMask: ${Binary(brMask.asUInt)}, rvcMask: ${Binary(rvcMask.asUInt)}\n")
@@ -1039,7 +1039,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   out_entry.display(ftbEntryGen.cfiIndex.valid)
 
   // XSDebug(ftbEntryGen.cfiIndex.valid, p"fall thru: ${Hexadecimal(out_entry.getFallThrough(bpd_update_arbiter.io.out.bits.pc))}\n")
-  XSDebug(ftbEntryGen.cfiIndex.valid, p"FTB Entry: fall-thru: ${out_entry.getFallThrough(bpd_update_arbiter.io.out.bits.pc)}\n")
+  XSDebug(ftbEntryGen.cfiIndex.valid, p"FTBEntry: fall-thru: ${out_entry.getFallThrough(bpd_update_arbiter.io.out.bits.pc)}\n")
 
 
   // -------------------------------------------------------

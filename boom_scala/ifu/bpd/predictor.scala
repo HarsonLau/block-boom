@@ -87,8 +87,8 @@ class BranchPredictionUpdate(implicit p: Parameters) extends BoomBundle()(p)
   def display(cond: Bool , decimal:Boolean = true, _prefix:chisel3.Printable = p""):Unit={
     val prefix = _prefix + p"BranchPredictionUpdate: "
     if(decimal){
-      XSDebug(cond, prefix + p"pc:${pc}, br_mask:${br_mask}, cfi_idx.valid:${cfi_idx.valid}, cfi_idx.bits:${cfi_idx.bits}, cfi_taken:${cfi_taken}, cfi_mispredicted:${cfi_mispredicted}, cfi_is_br:${cfi_is_br}, cfi_is_jal:${cfi_is_jal}, cfi_is_jalr:${cfi_is_jalr}, target:${target}\n")
-      XSDebug(cond, prefix + p"btb_mispredicts:${btb_mispredicts}, is_mispredict_update:${is_mispredict_update}, is_repair_update:${is_repair_update}\n")
+      XSDebug(cond, prefix + p"pc: ${pc} br_mask: ${br_mask} cfi_idx.valid: ${cfi_idx.valid} cfi_idx.bits: ${cfi_idx.bits} cfi_taken: ${cfi_taken} cfi_mispredicted: ${cfi_mispredicted} cfi_is_br: ${cfi_is_br} cfi_is_jal: ${cfi_is_jal} cfi_is_jalr: ${cfi_is_jalr} target: ${target}\n")
+      XSDebug(cond, prefix + p"btb_mispredicts: ${btb_mispredicts} is_mispredict_update: ${is_mispredict_update} is_repair_update:${is_repair_update}\n")
       pd.display(cond, true, prefix)
       
       // XSDebug(cond, prefix + p"ghist:${ghist}\n")
