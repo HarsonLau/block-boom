@@ -231,10 +231,78 @@ class BlockBranchPredictionUpdate(implicit p: Parameters) extends BoomBundle()(p
   val meta          = UInt(bpdMaxMetaLength.W)
 }
 
-class BlockBranchPredictionRequest(implicit p: Parameters) extends BoomBundle()(p)
+// class BlockBranchPredictionRequest(implicit p: Parameters) extends BoomBundle()(p)
+// {
+//   val pc    = UInt(vaddrBitsExtended.W)
+//   val ghist = new GlobalHistory
+// }
+
+class BlockBranchPredictionBankResponse(implicit p: Parameters) extends BoomBundle()(p)
+  with HasBoomFTBParameters
 {
-  val pc    = UInt(vaddrBitsExtended.W)
-  val ghist = new GlobalHistory
+  val f1 = new BlockBranchPrediction 
+  val f2 = new BlockBranchPrediction
+  val f3 = new BlockBranchPrediction
+}
+
+
+abstract class BlockBranchPredictorBank(implicit p: Parameters) extends BoomModule()(p)
+  with HasBoomFTBParameters
+{
+  val metaSz = 0
+  def nInputs = 1
+
+  val mems: Seq[Tuple3[String, Int, Int]]
+
+  val io = IO(new Bundle {
+    val f0_valid = Input(Bool())
+    val f0_pc    = Input(UInt(vaddrBitsExtended.W))
+    val f0_mask  = Input(UInt(predictWidth.W))
+    // Local history not available until end of f1
+    val f1_ghist = Input(UInt(globalHistoryLength.W))
+    val f1_lhist = Input(UInt(localHistoryLength.W))
+
+    val resp_in = Input(Vec(nInputs, new BlockBranchPredictionBankResponse))
+    val resp = Output(new BlockBranchPredictionBankResponse)
+
+    // Store the meta as a UInt, use width inference to figure out the shape
+    val f3_meta = Output(UInt(bpdMaxMetaLength.W))
+
+    val f3_fire = Input(Bool())
+
+    val update = Input(Valid(new BlockBranchPredictionUpdate))
+  })
+  io.resp := io.resp_in(0)
+
+  io.f3_meta := 0.U
+
+  val s0_idx       = fetchIdx(io.f0_pc)
+  val s1_idx       = RegNext(s0_idx)
+  val s2_idx       = RegNext(s1_idx)
+  val s3_idx       = RegNext(s2_idx)
+
+  val s0_valid = io.f0_valid
+  val s1_valid = RegNext(s0_valid)
+  val s2_valid = RegNext(s1_valid)
+  val s3_valid = RegNext(s2_valid)
+
+  val s0_mask = io.f0_mask
+  val s1_mask = RegNext(s0_mask)
+  val s2_mask = RegNext(s1_mask)
+  val s3_mask = RegNext(s2_mask)
+
+  val s0_pc = io.f0_pc
+  val s1_pc = RegNext(s0_pc)
+
+  val s0_update     = io.update
+  val s0_update_idx = fetchIdx(io.update.bits.pc)
+  val s0_update_valid = io.update.valid
+
+  val s1_update     = RegNext(s0_update)
+  val s1_update_idx = RegNext(s0_update_idx)
+  val s1_update_valid = RegNext(s0_update_valid)
+
+  // bpd.io.resp.ftb_entry := DontCare
 }
 
 class BlockBranchPredictor(implicit p:Parameters) extends BoomModule()(p)
@@ -244,7 +312,7 @@ class BlockBranchPredictor(implicit p:Parameters) extends BoomModule()(p)
   val io = IO(new Bundle {
 
     // Requests and responses
-    val f0_req = Input(Valid(new BlockBranchPredictionRequest))
+    val f0_req = Input(Valid(new BranchPredictionRequest))
 
     val resp = Output(new Bundle {
       val f1 = new BlockBranchPredictionBundle
@@ -256,7 +324,7 @@ class BlockBranchPredictor(implicit p:Parameters) extends BoomModule()(p)
     val f3_fire = Input(Bool())
 
     // Update
-    val update = Input(Valid(new BlockBranchPredictionUpdate))
+    val update = Input(Valid(new BranchPredictionBankUpdate))
   })
 
   io.resp.ftb_entry:=DontCare
