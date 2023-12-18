@@ -188,7 +188,7 @@ class BlockBranchPredictionBundle(implicit p: Parameters) extends BoomBundle()(p
     val pc = UInt(vaddrBitsExtended.W)
     val pred = new BlockBranchPrediction
     val meta = UInt(bpdMaxMetaLength.W)
-    val lhsit = UInt(localHistoryLength.W)
+    val lhist = UInt(localHistoryLength.W)
 }
 
 class BlockBranchPredictionUpdate(implicit p: Parameters) extends BoomBundle()(p)
@@ -305,6 +305,12 @@ abstract class BlockBranchPredictorBank(implicit p: Parameters) extends BoomModu
   // bpd.io.resp.ftb_entry := DontCare
 }
 
+class NullBlockBranchPredictorBank(implicit p: Parameters) extends BlockBranchPredictorBank()(p)
+  with HasBoomFTBParameters
+{
+  val mems = Nil
+}
+
 class BlockBranchPredictor(implicit p:Parameters) extends BoomModule()(p)
     with HasBoomFTBParameters
 {
@@ -324,9 +330,80 @@ class BlockBranchPredictor(implicit p:Parameters) extends BoomModule()(p)
     val f3_fire = Input(Bool())
 
     // Update
-    val update = Input(Valid(new BranchPredictionBankUpdate))
+    val update = Input(Valid(new BranchPredictionUpdate))
   })
 
   io.resp.ftb_entry:=DontCare
+
+  val predictors = new NullBlockBranchPredictorBank
+  val lhist_providers = Module(if(localHistoryNSets > 0) new LocalBranchPredictorBank else new NullLocalBranchPredictorBank)
+
+  lhist_providers.io.f0_valid := io.f0_req.valid
+  lhist_providers.io.f0_pc    := io.f0_req.bits.pc // TODO: the original impl uses bankAlignPC
+
+  predictors.io.f0_valid := io.f0_req.valid
+  predictors.io.f0_pc    := io.f0_req.bits.pc
+  predictors.io.f0_mask  := fetchMask(io.f0_req.bits.pc)
+
+  predictors.io.f1_ghist := RegNext(io.f0_req.bits.ghist.histories(0)) // TODO: 0?
+  predictors.io.f1_lhist := lhist_providers.io.f1_lhist
+
+  predictors.io.resp_in(0) := 0.U.asTypeOf(new BlockBranchPredictionBankResponse)
+
+  //TODO: f3_taken_br
+
+  io.resp.f1.pred := predictors.io.resp.f1
+  io.resp.f2.pred := predictors.io.resp.f2
+  io.resp.f3.pred := predictors.io.resp.f3
+  io.resp.f3.meta := predictors.io.f3_meta
+  io.resp.f3.lhist := lhist_providers.io.f3_lhist
+
+  predictors.io.f3_fire := io.f3_fire
+  lhist_providers.io.f3_fire := io.f3_fire
+
+  io.resp.f1.pc := RegNext(io.f0_req.bits.pc)
+  io.resp.f2.pc := RegNext(io.resp.f1.pc)
+  io.resp.f3.pc := RegNext(io.resp.f2.pc)
+
+  // We don't care about meta from the f1 and f2 resps
+  // Use the meta from the latest resp
+  io.resp.f1.meta := DontCare
+  io.resp.f2.meta := DontCare
+  io.resp.f1.lhist := DontCare
+  io.resp.f2.lhist := DontCare
+
+  // Update
+  predictors.io.update.bits.is_mispredict_update := io.update.bits.is_mispredict_update
+  predictors.io.update.bits.is_repair_update := io.update.bits.is_repair_update
+  predictors.io.update.bits.meta := io.update.bits.meta(0)
+  predictors.io.update.bits.lhist := io.update.bits.lhist(0)
+  predictors.io.update.bits.cfi_idx.bits := io.update.bits.cfi_idx.bits
+  predictors.io.update.bits.cfi_taken := io.update.bits.cfi_taken
+  predictors.io.update.bits.cfi_mispredicted := io.update.bits.cfi_mispredicted
+  predictors.io.update.bits.cfi_is_br := io.update.bits.cfi_is_br
+  predictors.io.update.bits.cfi_is_jal := io.update.bits.cfi_is_jal
+  predictors.io.update.bits.cfi_is_jalr := io.update.bits.cfi_is_jalr
+  predictors.io.update.bits.target := io.update.bits.target
+
+  lhist_providers.io.update.mispredict := io.update.bits.is_mispredict_update
+  lhist_providers.io.update.repair := io.update.bits.is_repair_update
+  lhist_providers.io.update.lhist := io.update.bits.lhist(0)
+
+  predictors.io.update.valid := io.update.valid
+  predictors.io.update.bits.pc := io.update.bits.pc // TODO: the original impl uses bankAlignPC
+  predictors.io.update.bits.br_mask := io.update.bits.br_mask
+  predictors.io.update.bits.btb_mispredicts := io.update.bits.btb_mispredicts
+  predictors.io.update.bits.cfi_idx.valid := io.update.bits.cfi_idx.valid
+  predictors.io.update.bits.ghist := io.update.bits.ghist.histories(0)
+
+  lhist_providers.io.update.valid := io.update.valid && io.update.bits.br_mask =/= 0.U
+  lhist_providers.io.update.pc := io.update.bits.pc // TODO: the original impl uses bankAlignPC
+
+  when(io.update.valid){
+    when(io.update.bits.cfi_is_br && io.update.bits.cfi_idx.valid){
+      assert(io.update.bits.br_mask(io.update.bits.cfi_idx.bits))
+    }
+  }
+
 
 }
