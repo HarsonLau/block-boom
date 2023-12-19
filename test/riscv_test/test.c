@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
+#include "fordfulk.h"
 
 uint64_t procTag=0x1234567;
 uint64_t maxevent=0, warmupinst=0, eventsel=0;
@@ -23,6 +24,8 @@ int main()
         t3 = t2 + t3;
         tempStackMem[i%4096] = t1 + t2 + t3;
     }
+
+    do_fordfulk();
 
     ReadCounter16(&hpcounters[0], 0);
 	ReadCounter16(&hpcounters[16], 16);
