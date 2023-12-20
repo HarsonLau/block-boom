@@ -380,7 +380,9 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   require(fetchWidth*coreInstBytes == outer.icacheParams.fetchBytes)
 
   val bpd = Module(new BranchPredictor)
+  val nbpd = Module(new BlockBranchPredictor)
   bpd.io.f3_fire := false.B
+  nbpd.io.f3_fire := false.B
   val ras = Module(new BoomRAS)
 
   val icache = outer.icache.module
@@ -426,8 +428,11 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   icache.io.req.bits.addr := s0_vpc
 
   bpd.io.f0_req.valid      := s0_valid
+  nbpd.io.f0_req.valid     := s0_valid
   bpd.io.f0_req.bits.pc    := s0_vpc // The branch predictor is requested using the actual PC
+  nbpd.io.f0_req.bits.pc   := s0_vpc // The branch predictor is requested using the actual PC
   bpd.io.f0_req.bits.ghist := s0_ghist
+  nbpd.io.f0_req.bits.ghist:= s0_ghist
 
   // --------------------------------------------------------
   // **** ICache Access (F1) ****
@@ -452,6 +457,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   val s1_tlb_resp = Mux(s1_is_replay, RegNext(s0_replay_resp), tlb.io.resp)
   val s1_ppc  = Mux(s1_is_replay, RegNext(s0_replay_ppc), tlb.io.resp.paddr)
   val s1_bpd_resp = bpd.io.resp.f1
+  val n_s1_bpd_resp = nbpd.io.resp.f1
 
   icache.io.s1_paddr := s1_ppc
   icache.io.s1_kill  := tlb.io.resp.miss || f1_clear
@@ -463,11 +469,15 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
       (s1_bpd_resp.preds(i).is_br && s1_bpd_resp.preds(i).taken))
   }
   val f1_redirect_idx = PriorityEncoder(f1_redirects)
+  val n_f1_redirect_idx = n_s1_bpd_resp.pred.cfiIndex.bits // FTB
   val f1_do_redirect = f1_redirects.reduce(_||_) && useBPD.B
+  val n_f1_do_redirect = n_s1_bpd_resp.pred.cfiIndex.valid && useBPD.B // FTB
   val f1_targs = s1_bpd_resp.preds.map(_.predicted_pc.bits)
   val f1_predicted_target = Mux(f1_do_redirect,
                                 f1_targs(f1_redirect_idx),
                                 nextFetch(s1_vpc))
+  
+  val n_f1_predicted_target = n_s1_bpd_resp.pred.target(n_s1_bpd_resp.pc) // FTB
 
   val f1_predicted_ghist = s1_ghist.update(
     s1_bpd_resp.preds.map(p => p.is_br && p.predicted_pc.valid).asUInt & f1_mask,
@@ -475,6 +485,16 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     s1_bpd_resp.preds(f1_redirect_idx).is_br,
     f1_redirect_idx,
     f1_do_redirect,
+    s1_vpc,
+    false.B,
+    false.B)
+  
+  val n_f1_predicted_ghist = s1_ghist.update(
+    n_s1_bpd_resp.pred.brMask.asUInt & f1_mask.asUInt,
+    n_s1_bpd_resp.pred.real_slot_taken() && n_f1_do_redirect,
+    n_s1_bpd_resp.pred.hit_taken_on_br,
+    n_f1_redirect_idx,
+    n_f1_do_redirect,
     s1_vpc,
     false.B,
     false.B)
@@ -512,6 +532,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   icache.io.s2_kill := s2_xcpt
 
   val f2_bpd_resp = bpd.io.resp.f2
+  val n_f2_bpd_resp = nbpd.io.resp.f2
   val f2_mask = fetchMask(s2_vpc)
   val f2_redirects = (0 until fetchWidth) map { i =>
     s2_valid && f2_mask(i) && f2_bpd_resp.preds(i).predicted_pc.valid &&
@@ -519,11 +540,15 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
       (f2_bpd_resp.preds(i).is_br && f2_bpd_resp.preds(i).taken))
   }
   val f2_redirect_idx = PriorityEncoder(f2_redirects)
+  val n_f2_redirect_idx = n_f2_bpd_resp.pred.cfiIndex.bits // FTB
   val f2_targs = f2_bpd_resp.preds.map(_.predicted_pc.bits)
   val f2_do_redirect = f2_redirects.reduce(_||_) && useBPD.B
+  val n_f2_do_redirect = n_f2_bpd_resp.pred.cfiIndex.valid && useBPD.B // FTB
   val f2_predicted_target = Mux(f2_do_redirect,
                                 f2_targs(f2_redirect_idx),
                                 nextFetch(s2_vpc))
+  val n_f2_predicted_target = n_f2_bpd_resp.pred.target(n_f2_bpd_resp.pc) // FTB
+
   val f2_predicted_ghist = s2_ghist.update(
     f2_bpd_resp.preds.map(p => p.is_br && p.predicted_pc.valid).asUInt & f2_mask,
     f2_bpd_resp.preds(f2_redirect_idx).taken && f2_do_redirect,
@@ -533,8 +558,18 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     s2_vpc,
     false.B,
     false.B)
+  val n_f2_predicted_ghist = s2_ghist.update(
+    n_f2_bpd_resp.pred.brMask.asUInt & f2_mask.asUInt,
+    n_f2_bpd_resp.pred.real_slot_taken() && n_f2_do_redirect,
+    n_f2_bpd_resp.pred.hit_taken_on_br,
+    n_f2_redirect_idx,
+    n_f2_do_redirect,
+    s2_vpc,
+    false.B,
+    false.B)
 
   val f2_correct_f1_ghist = s1_ghist =/= f2_predicted_ghist && enableGHistStallRepair.B
+  val n_f2_correct_f1_ghist = s1_ghist =/= n_f2_predicted_ghist && enableGHistStallRepair.B
 
   when ((s2_valid && !icache.io.resp.valid) ||
         (s2_valid && icache.io.resp.valid && !f3_ready)) {
@@ -578,6 +613,8 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   val f3_bpd_resp = withReset(reset.asBool || f3_clear) {
     Module(new Queue(new BranchPredictionBundle, 1, pipe=true, flow=true)) }
 
+  val n_f3_bpd_resp = withReset(reset.asBool || f3_clear) {
+    Module(new Queue(new BlockBranchPredictionBundle, 1, pipe=true, flow=true)) }
 
 
 
@@ -605,13 +642,20 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
 
   // The BPD resp comes in f3
   f3_bpd_resp.io.enq.valid := f3.io.deq.valid && RegNext(f3.io.enq.ready)
+  n_f3_bpd_resp.io.enq.valid := f3.io.deq.valid && RegNext(f3.io.enq.ready) // FTB
   f3_bpd_resp.io.enq.bits  := bpd.io.resp.f3
+  n_f3_bpd_resp.io.enq.bits := nbpd.io.resp.f3 // FTB
   when (f3_bpd_resp.io.enq.fire()) {
     bpd.io.f3_fire := true.B
   }
 
+  when (n_f3_bpd_resp.io.enq.fire()) { // FTB
+    nbpd.io.f3_fire := true.B
+  }
+
   f3.io.deq.ready := f4_ready
   f3_bpd_resp.io.deq.ready := f4_ready
+  n_f3_bpd_resp.io.deq.ready := f4_ready // FTB
 
 
   val f3_imemresp     = f3.io.deq.bits
@@ -789,8 +833,10 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
       //  2) the BPD believes this is a branch and says we should take it
       f3_redirects(i)    := f3_mask(i) && (
         brsigs.cfi_type === CFI_JAL || brsigs.cfi_type === CFI_JALR ||
-        (brsigs.cfi_type === CFI_BR && f3_bpd_resp.io.deq.bits.preds(i).taken && useBPD.B)
+        (brsigs.cfi_type === CFI_BR && n_f3_bpd_resp.io.deq.bits.pred.is_taken(i.asUInt) && useBPD.B)
+        // (brsigs.cfi_type === CFI_BR && f3_bpd_resp.io.deq.bits.preds(i).taken && useBPD.B)
       )
+      // TODO: check this in new BPD
 
       f3_br_mask(i)   := f3_mask(i) && brsigs.cfi_type === CFI_BR
       f3_cfi_types(i) := brsigs.cfi_type
@@ -1040,6 +1086,23 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
 
   // XSDebug(ftbEntryGen.cfiIndex.valid, p"fall thru: ${Hexadecimal(out_entry.getFallThrough(bpd_update_arbiter.io.out.bits.pc))}\n")
   XSDebug(ftbEntryGen.cfiIndex.valid, p"FTBEntry: fall-thru: ${out_entry.getFallThrough(bpd_update_arbiter.io.out.bits.pc)}\n")
+
+  nbpd.io.update.valid := bpd_update_arbiter.io.out.valid
+  nbpd.io.update.bits.is_mispredict_update := bpd_update_arbiter.io.out.bits.is_mispredict_update
+  nbpd.io.update.bits.is_repair_update := bpd_update_arbiter.io.out.bits.is_repair_update
+  nbpd.io.update.bits.btb_mispredicts := bpd_update_arbiter.io.out.bits.btb_mispredicts
+  nbpd.io.update.bits.pc := bpd_update_arbiter.io.out.bits.pc
+  nbpd.io.update.bits.br_mask := bpd_update_arbiter.io.out.bits.br_mask
+  nbpd.io.update.bits.cfi_idx := bpd_update_arbiter.io.out.bits.cfi_idx
+  nbpd.io.update.bits.cfi_taken := bpd_update_arbiter.io.out.bits.cfi_taken
+  nbpd.io.update.bits.cfi_mispredicted := bpd_update_arbiter.io.out.bits.cfi_mispredicted
+  nbpd.io.update.bits.cfi_is_br := bpd_update_arbiter.io.out.bits.cfi_is_br
+  nbpd.io.update.bits.cfi_is_jal := bpd_update_arbiter.io.out.bits.cfi_is_jal
+  nbpd.io.update.bits.cfi_is_jalr := bpd_update_arbiter.io.out.bits.cfi_is_jalr
+  nbpd.io.update.bits.ghist := bpd_update_arbiter.io.out.bits.ghist
+  nbpd.io.update.bits.lhist := bpd_update_arbiter.io.out.bits.lhist(0)
+  nbpd.io.update.bits.target := bpd_update_arbiter.io.out.bits.target
+  nbpd.io.update.bits.meta := bpd_update_arbiter.io.out.bits.meta(0)
 
 
   // -------------------------------------------------------

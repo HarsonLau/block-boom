@@ -71,7 +71,14 @@ with HasBoomFTBParameters
     VecInit(br_slot_valids :+ (tail_slot_valid && is_br_sharing))
   }
 
-  // seems the length is numBr
+  /**
+   * Returns a mask indicating if the branch is taken for each slot.
+   * The mask is of length numBr.
+   * If the branch is not valid, the corresponding bit is false.
+   * However, the hit bit is not considered.
+   *
+   * @return A VecInit representing the mask of taken branches for each slot.
+   */
   def taken_mask_on_slot = {
     VecInit(
       (br_slot_valids zip br_taken_mask.init).map{ case (t, v) => t && v } :+ (
@@ -82,11 +89,21 @@ with HasBoomFTBParameters
     )
   }
 
+  // returns true if the slot at idx is valid and predicted taken
+  def is_taken(idx: UInt) : Bool = {
+    (taken_mask_on_slot zip offsets).map{ case (t, o) => t && o === idx }.reduce(_|_)
+  }
+
   def real_slot_taken_mask(): Vec[Bool] = {
     VecInit(taken_mask_on_slot.map(_ && hit))
   }
 
+  def real_slot_taken(): Bool = {
+    real_slot_taken_mask().reduce(_||_)
+  }
+
   // len numBr
+  // if the tailslot contains a br and the br is taken, then the tailslot is taken
   def real_br_taken_mask(): Vec[Bool] = {
     VecInit(
       taken_mask_on_slot.map(_ && hit).init :+
@@ -139,7 +156,10 @@ with HasBoomFTBParameters
   def hit_taken_on_call = hit_taken_on_jmp && is_call
   def hit_taken_on_ret  = hit_taken_on_jmp && is_ret
   def hit_taken_on_jalr = hit_taken_on_jmp && is_jalr
+  def hit_taken_on_br = hit && real_slot_taken_mask().reduce(_||_) && !hit_taken_on_jmp
 
+  // returns the index of the cfi that is taken
+  // if no cfi is taken, return PredictWidth-1
   def cfiIndex = {
     // val cfiIndex = Wire(ValidUndirectioned(UInt(log2Ceil(PredictWidth).W)))
     val cfiIndex = Wire(Valid(UInt(log2Ceil(predictWidth).W)))
@@ -152,6 +172,12 @@ with HasBoomFTBParameters
   }
 
   def taken = br_taken_mask.reduce(_||_) || slot_valids.last // || (is_jal || is_jalr)
+
+  def brMask: UInt = {
+    (br_valids zip offsets).map{ case (t, o) => (t << o)}.reduce(_|_).asUInt()
+  }
+
+
 
   // def fromFtbEntry(
   //                   entry: FTBEntry,
@@ -222,7 +248,8 @@ class BlockBranchPredictionUpdate(implicit p: Parameters) extends BoomBundle()(p
   //val cfi_is_ret  = Bool()
 
   val ghist = new GlobalHistory
-  val lhist = Vec(nBPBanks, UInt(localHistoryLength.W))
+  // val lhist = Vec(nBPBanks, UInt(localHistoryLength.W))
+  val lhist = UInt(localHistoryLength.W)
 
 
   // What did this CFI jump to?
@@ -243,6 +270,36 @@ class BlockBranchPredictionBankResponse(implicit p: Parameters) extends BoomBund
   val f1 = new BlockBranchPrediction 
   val f2 = new BlockBranchPrediction
   val f3 = new BlockBranchPrediction
+}
+
+class BlockBranchPredictionBankUpdate(implicit p: Parameters) extends BoomBundle()(p)
+  with HasBoomFTBParameters
+{
+  val is_mispredict_update     = Bool()
+  val is_repair_update         = Bool()
+
+  val btb_mispredicts  = UInt(BPBankWidth.W)
+  def is_btb_mispredict_update = btb_mispredicts =/= 0.U
+
+  def is_commit_update = !(is_mispredict_update || is_repair_update || is_btb_mispredict_update)
+
+  val pc               = UInt(vaddrBitsExtended.W)
+
+  val br_mask          = UInt(BPBankWidth.W)
+  val cfi_idx          = Valid(UInt(log2Ceil(BPBankWidth).W))
+  val cfi_taken        = Bool()
+  val cfi_mispredicted = Bool()
+
+  val cfi_is_br        = Bool()
+  val cfi_is_jal       = Bool()
+  val cfi_is_jalr      = Bool()
+
+  val ghist            = UInt(globalHistoryLength.W)
+  val lhist            = UInt(localHistoryLength.W)
+
+  val target           = UInt(vaddrBitsExtended.W)
+
+  val meta             = UInt(bpdMaxMetaLength.W)
 }
 
 
@@ -270,7 +327,7 @@ abstract class BlockBranchPredictorBank(implicit p: Parameters) extends BoomModu
 
     val f3_fire = Input(Bool())
 
-    val update = Input(Valid(new BlockBranchPredictionUpdate))
+    val update = Input(Valid(new BlockBranchPredictionBankUpdate))
   })
   io.resp := io.resp_in(0)
 
@@ -311,6 +368,8 @@ class NullBlockBranchPredictorBank(implicit p: Parameters) extends BlockBranchPr
   val mems = Nil
 }
 
+
+
 class BlockBranchPredictor(implicit p:Parameters) extends BoomModule()(p)
     with HasBoomFTBParameters
 {
@@ -330,12 +389,12 @@ class BlockBranchPredictor(implicit p:Parameters) extends BoomModule()(p)
     val f3_fire = Input(Bool())
 
     // Update
-    val update = Input(Valid(new BranchPredictionUpdate))
+    val update = Input(Valid(new BlockBranchPredictionUpdate))
   })
 
   io.resp.ftb_entry:=DontCare
 
-  val predictors = new NullBlockBranchPredictorBank
+  val predictors = Module (new NullBlockBranchPredictorBank)
   val lhist_providers = Module(if(localHistoryNSets > 0) new LocalBranchPredictorBank else new NullLocalBranchPredictorBank)
 
   lhist_providers.io.f0_valid := io.f0_req.valid
@@ -351,6 +410,7 @@ class BlockBranchPredictor(implicit p:Parameters) extends BoomModule()(p)
   predictors.io.resp_in(0) := 0.U.asTypeOf(new BlockBranchPredictionBankResponse)
 
   //TODO: f3_taken_br
+  lhist_providers.io.f3_taken_br := predictors.io.resp.f3.hit_taken_on_br
 
   io.resp.f1.pred := predictors.io.resp.f1
   io.resp.f2.pred := predictors.io.resp.f2
@@ -376,7 +436,7 @@ class BlockBranchPredictor(implicit p:Parameters) extends BoomModule()(p)
   predictors.io.update.bits.is_mispredict_update := io.update.bits.is_mispredict_update
   predictors.io.update.bits.is_repair_update := io.update.bits.is_repair_update
   predictors.io.update.bits.meta := io.update.bits.meta(0)
-  predictors.io.update.bits.lhist := io.update.bits.lhist(0)
+  predictors.io.update.bits.lhist := io.update.bits.lhist
   predictors.io.update.bits.cfi_idx.bits := io.update.bits.cfi_idx.bits
   predictors.io.update.bits.cfi_taken := io.update.bits.cfi_taken
   predictors.io.update.bits.cfi_mispredicted := io.update.bits.cfi_mispredicted
@@ -387,7 +447,7 @@ class BlockBranchPredictor(implicit p:Parameters) extends BoomModule()(p)
 
   lhist_providers.io.update.mispredict := io.update.bits.is_mispredict_update
   lhist_providers.io.update.repair := io.update.bits.is_repair_update
-  lhist_providers.io.update.lhist := io.update.bits.lhist(0)
+  lhist_providers.io.update.lhist := io.update.bits.lhist
 
   predictors.io.update.valid := io.update.valid
   predictors.io.update.bits.pc := io.update.bits.pc // TODO: the original impl uses bankAlignPC
