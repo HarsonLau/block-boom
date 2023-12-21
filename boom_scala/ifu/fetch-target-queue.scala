@@ -123,7 +123,7 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
 
     val brupdate = Input(new BrUpdateInfo)
 
-    val bpdupdate = Output(Valid(new BranchPredictionUpdate))
+    val bpdupdate = Output(Valid(new BlockBranchPredictionUpdate))
 
     val ras_update = Output(Bool())
     val ras_update_idx = Output(UInt(log2Ceil(nRasEntries).W))
@@ -142,11 +142,11 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
 
   val pcs      = Reg(Vec(num_entries, UInt(vaddrBitsExtended.W)))
   val pds      = Reg(Vec(num_entries, new PredecodeBundle))
-  val meta     = SyncReadMem(num_entries, Vec(nBPBanks, UInt(bpdMaxMetaLength.W)))
+  val meta     = SyncReadMem(num_entries,  UInt(bpdMaxMetaLength.W))
   val ram      = Reg(Vec(num_entries, new FTQBundle))
   val ghist    = Seq.fill(2) { SyncReadMem(num_entries, new GlobalHistory) }
   val lhist    = if (useLHist) {
-    Some(SyncReadMem(num_entries, Vec(nBPBanks, UInt(localHistoryLength.W))))
+    Some(SyncReadMem(num_entries, UInt(localHistoryLength.W)))
   } else {
     None
   }
@@ -243,7 +243,8 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
   val bpd_lhist = if (useLHist) {
     lhist.get.read(bpd_idx, true.B)
   } else {
-    VecInit(Seq.fill(nBPBanks) { 0.U })
+    // VecInit(Seq.fill(nBPBanks) { 0.U })
+    0.U
   }
   val bpd_meta  = meta.read(bpd_idx, true.B) // TODO fix these SRAMs
   val bpd_pc    = RegNext(pcs(bpd_idx))

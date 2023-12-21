@@ -8,7 +8,7 @@ import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
 
 import boom.common._
-import boom.util.{BoomCoreStringPrefix}
+import boom.util._
 
 /**
  * Object that selects a target from a vector of all possible targets of a BP stage based on the taken mask and hit signal.
@@ -139,6 +139,23 @@ with HasBoomFTBParameters
     selectByTaken(taken_mask_on_slot, hit, allTarget(pc))
   }
 
+  def getTarget(idx:UInt, pc:UInt):UInt = {
+    val idx_match_mask = VecInit(offsets.map(_ === idx))
+    val taken_idx_match_mask = idx_match_mask.zip(taken_mask_on_slot).map{ case (a, b) => a && b}
+    selectByTaken(taken_mask_on_slot, hit, allTarget(pc))
+  }
+
+  def validPredict(idx: UInt):Bool = {
+    val idx_match_mask = VecInit(offsets.map(_ === idx))
+    val taken_idx_match_mask = idx_match_mask.zip(taken_mask_on_slot).map{ case (a, b) => a && b}
+    taken_idx_match_mask.reduce(_||_)
+  }
+
+  // if there is a jmp in the entry, return the target of the jmp
+  def getJmpTarget(pc:UInt): UInt = {
+    targets.last
+  }
+
   // allTarget return a Vec of all possible target of a BP stage
   // in the following order: [taken_target0, taken_target1, ..., fallThroughAddr, not hit (plus fetch width) & alignment]
   //
@@ -256,6 +273,29 @@ class BlockBranchPredictionUpdate(implicit p: Parameters) extends BoomBundle()(p
   val target        = UInt(vaddrBitsExtended.W)
 
   val meta          = UInt(bpdMaxMetaLength.W)
+
+  val pd = new PredecodeBundle
+
+  def display(cond: Bool , decimal:Boolean = true, _prefix:chisel3.Printable = p""):Unit={
+    val prefix = _prefix + p"BranchPredictionUpdate: "
+    if(decimal){
+      XSDebug(cond, prefix + p"pc: ${pc} br_mask: ${br_mask} cfi_idx.valid: ${cfi_idx.valid} cfi_idx.bits: ${cfi_idx.bits} cfi_taken: ${cfi_taken} cfi_mispredicted: ${cfi_mispredicted} cfi_is_br: ${cfi_is_br} cfi_is_jal: ${cfi_is_jal} cfi_is_jalr: ${cfi_is_jalr} target: ${target}\n")
+      XSDebug(cond, prefix + p"btb_mispredicts: ${btb_mispredicts} is_mispredict_update: ${is_mispredict_update} is_repair_update:${is_repair_update}\n")
+      pd.display(cond, true, prefix)
+      
+      // XSDebug(cond, prefix + p"ghist:${ghist}\n")
+      // XSDebug(cond, prefix + p"lhist:${lhist}\n")
+    }
+    else{
+      XSDebug(cond, prefix + p"pc:0x${Hexadecimal(pc)}, br_mask:${Binary(br_mask)}, cfi_idx.valid:${cfi_idx.valid}, cfi_idx.bits:${cfi_idx.bits}, cfi_taken:${cfi_taken}, cfi_mispredicted:${cfi_mispredicted}, cfi_is_br:${cfi_is_br}, cfi_is_jal:${cfi_is_jal}, cfi_is_jalr:${cfi_is_jalr}, target:0x${Hexadecimal(target)}\n")
+      XSDebug(cond, prefix + p"btb_mispredicts:${Binary(btb_mispredicts)}, is_mispredict_update:${is_mispredict_update}, is_repair_update:${is_repair_update}\n")
+      pd.display(cond, false, prefix)
+      
+      // XSDebug(cond, prefix + p"ghist:${ghist}\n")
+      // XSDebug(cond, prefix + p"lhist:${lhist}\n")
+    }
+  }
+
 }
 
 // class BlockBranchPredictionRequest(implicit p: Parameters) extends BoomBundle()(p)
@@ -366,6 +406,8 @@ class NullBlockBranchPredictorBank(implicit p: Parameters) extends BlockBranchPr
   with HasBoomFTBParameters
 {
   val mems = Nil
+  io.resp := 0.U
+  io.f3_meta := 0.U
 }
 
 
@@ -392,6 +434,18 @@ class BlockBranchPredictor(implicit p:Parameters) extends BoomModule()(p)
     val update = Input(Valid(new BlockBranchPredictionUpdate))
   })
 
+  val bpdStr = new StringBuilder
+  bpdStr.append(BoomCoreStringPrefix("==Branch Predictor Memory Sizes==\n")) // TODO: fixme
+  // val banked_predictors = (0 until nBPBanks) map ( b => {
+  //   val m = Module(if (useBPD) new ComposedBranchPredictorBank else new NullBranchPredictorBank)
+  //   for ((n, d, w) <- m.mems) {
+  //     bpdStr.append(BoomCoreStringPrefix(f"bank$b $n: $d x $w = ${d * w / 8}"))
+  //     total_memsize = total_memsize + d * w / 8
+  //   }
+  //   m
+  // })
+  // bpdStr.append(BoomCoreStringPrefix(f"Total bpd size: ${total_memsize / 1024} KB\n"))
+  override def toString: String = bpdStr.toString
   io.resp.ftb_entry:=DontCare
 
   val predictors = Module (new NullBlockBranchPredictorBank)
