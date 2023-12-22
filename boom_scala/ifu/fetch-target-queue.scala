@@ -123,7 +123,7 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
 
     val brupdate = Input(new BrUpdateInfo)
 
-    val bpdupdate = Output(Valid(new BlockBranchPredictionUpdate))
+    val bpdupdate = Output(Valid(new BlockUpdate))
 
     val ras_update = Output(Bool())
     val ras_update_idx = Output(UInt(log2Ceil(nRasEntries).W))

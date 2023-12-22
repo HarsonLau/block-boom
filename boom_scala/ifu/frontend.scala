@@ -381,7 +381,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   require(fetchWidth*coreInstBytes == outer.icacheParams.fetchBytes)
 
   // val bpd = Module(new BranchPredictor)
-  val nbpd = Module(new BlockBranchPredictor)
+  val nbpd = Module(new BlockPredictor)
   // bpd.io.f3_fire := false.B
   nbpd.io.f3_fire := false.B
   val ras = Module(new BoomRAS)
@@ -405,7 +405,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   val s0_is_replay = WireInit(false.B)
   val s0_is_sfence = WireInit(false.B)
   val s0_replay_resp = Wire(new TLBResp)
-  val s0_replay_bpd_resp = Wire(new BlockBranchPredictionBundle)
+  val s0_replay_bpd_resp = Wire(new BlockPredictionBundle)
   val s0_replay_ppc  = Wire(UInt())
   val s0_s1_use_f3_bpd_resp = WireInit(false.B)
 
@@ -616,7 +616,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   //   Module(new Queue(new BranchPredictionBundle, 1, pipe=true, flow=true)) }
 
   val n_f3_bpd_resp = withReset(reset.asBool || f3_clear) {
-    Module(new Queue(new BlockBranchPredictionBundle, 1, pipe=true, flow=true)) }
+    Module(new Queue(new BlockPredictionBundle, 1, pipe=true, flow=true)) }
 
 
 
@@ -959,7 +959,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   }
 
   // When f3 finds a btb mispredict, queue up a bpd correction update
-  val f4_btb_corrections = Module(new Queue(new BlockBranchPredictionUpdate, 2)) // TODO: add FTB support here
+  val f4_btb_corrections = Module(new Queue(new BlockUpdate, 2)) // TODO: add FTB support here
   f4_btb_corrections.io.enq.valid := f3.io.deq.fire() && f3_btb_mispredicts.reduce(_||_) && enableBTBFastRepair.B
   f4_btb_corrections.io.enq.bits  := DontCare
   f4_btb_corrections.io.enq.bits.is_mispredict_update := false.B
@@ -1046,7 +1046,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   ftq.io.enq.valid          := f4.io.deq.valid && fb.io.enq.ready && !f4_delay
   ftq.io.enq.bits           := f4.io.deq.bits
 
-  val bpd_update_arbiter = Module(new Arbiter(new BlockBranchPredictionUpdate, 2))
+  val bpd_update_arbiter = Module(new Arbiter(new BlockUpdate, 2))
   bpd_update_arbiter.io.in(0).valid := ftq.io.bpdupdate.valid
   bpd_update_arbiter.io.in(0).bits  := ftq.io.bpdupdate.bits
   assert(bpd_update_arbiter.io.in(0).ready)

@@ -31,7 +31,7 @@ object selectByTaken {
   }
 }
 
-class BlockBranchPrediction(implicit p: Parameters) extends BoomBundle()(p)
+class BlockPrediction(implicit p: Parameters) extends BoomBundle()(p)
 with HasBoomFTBParameters
 {
   val br_taken_mask = Vec(numBr, Bool())
@@ -227,54 +227,73 @@ with HasBoomFTBParameters
   // }
 }
 
-class BlockBranchPredictionBundle(implicit p: Parameters) extends BoomBundle()(p)
+class BlockPredictionBundle(implicit p: Parameters) extends BoomBundle()(p)
   with HasBoomFTBParameters
 {
     val pc = UInt(vaddrBitsExtended.W)
-    val pred = new BlockBranchPrediction
+    val pred = new BlockPrediction
     val meta = UInt(bpdMaxMetaLength.W)
     val lhist = UInt(localHistoryLength.W)
 }
 
-class BlockBranchPredictionUpdate(implicit p: Parameters) extends BoomBundle()(p)
+class BPBankUpdate(implicit p: Parameters) extends BoomBundle()(p)
   with HasBoomFTBParameters
 {
-  // Indicates that this update is due to a speculated misprediction
-  // Local predictors typically update themselves with speculative info
-  // Global predictors only care about non-speculative updates
-  val is_mispredict_update = Bool()
-  val is_repair_update = Bool()
-  val btb_mispredicts = UInt(fetchWidth.W)
+  val is_mispredict_update     = Bool()
+  val is_repair_update         = Bool()
+
+  val btb_mispredicts  = UInt(BPBankWidth.W)
   def is_btb_mispredict_update = btb_mispredicts =/= 0.U
+
   def is_commit_update = !(is_mispredict_update || is_repair_update || is_btb_mispredict_update)
 
-  val pc            = UInt(vaddrBitsExtended.W)
-  // Mask of instructions which are branches.
-  // If these are not cfi_idx, then they were predicted not taken
-  val br_mask       = UInt(fetchWidth.W)
-  // Which CFI was taken/mispredicted (if any)
-  val cfi_idx       = Valid(UInt(log2Ceil(fetchWidth).W))
-  // Was the cfi taken?
-  val cfi_taken     = Bool()
-  // Was the cfi mispredicted from the original prediction?
+  val pc               = UInt(vaddrBitsExtended.W)
+
+  val br_mask          = UInt(BPBankWidth.W)
+  val cfi_idx          = Valid(UInt(log2Ceil(BPBankWidth).W))
+  val cfi_taken        = Bool()
   val cfi_mispredicted = Bool()
-  // Was the cfi a br?
-  val cfi_is_br     = Bool()
-  // Was the cfi a jal/jalr?
-  val cfi_is_jal  = Bool()
-  // Was the cfi a jalr
-  val cfi_is_jalr = Bool()
-  //val cfi_is_ret  = Bool()
 
-  val ghist = new GlobalHistory
-  // val lhist = Vec(nBPBanks, UInt(localHistoryLength.W))
-  val lhist = UInt(localHistoryLength.W)
+  val cfi_is_br        = Bool()
+  val cfi_is_jal       = Bool()
+  val cfi_is_jalr      = Bool()
 
+  val ghist            = UInt(globalHistoryLength.W)
+  val lhist            = UInt(localHistoryLength.W)
 
-  // What did this CFI jump to?
-  val target        = UInt(vaddrBitsExtended.W)
+  val target           = UInt(vaddrBitsExtended.W)
 
-  val meta          = UInt(bpdMaxMetaLength.W)
+  val meta             = UInt(bpdMaxMetaLength.W)
+}
+
+class BlockUpdate(implicit p: Parameters) extends BoomBundle()(p)
+  with HasBoomFTBParameters
+{
+  val is_mispredict_update     = Bool()
+  val is_repair_update         = Bool()
+
+  val btb_mispredicts  = UInt(BPBankWidth.W)
+  def is_btb_mispredict_update = btb_mispredicts =/= 0.U
+
+  def is_commit_update = !(is_mispredict_update || is_repair_update || is_btb_mispredict_update)
+
+  val pc               = UInt(vaddrBitsExtended.W)
+
+  val br_mask          = UInt(BPBankWidth.W)
+  val cfi_idx          = Valid(UInt(log2Ceil(BPBankWidth).W))
+  val cfi_taken        = Bool()
+  val cfi_mispredicted = Bool()
+
+  val cfi_is_br        = Bool()
+  val cfi_is_jal       = Bool()
+  val cfi_is_jalr      = Bool()
+
+  val ghist            = new GlobalHistory
+  val lhist            = UInt(localHistoryLength.W)
+
+  val target           = UInt(vaddrBitsExtended.W)
+
+  val meta             = UInt(bpdMaxMetaLength.W)
 
   val pd = new PredecodeBundle
 
@@ -306,46 +325,17 @@ class BlockBranchPredictionUpdate(implicit p: Parameters) extends BoomBundle()(p
 //   val ghist = new GlobalHistory
 // }
 
-class BlockBranchPredictionBankResponse(implicit p: Parameters) extends BoomBundle()(p)
+class BPBankResponse(implicit p: Parameters) extends BoomBundle()(p)
   with HasBoomFTBParameters
 {
-  val f1 = new BlockBranchPrediction 
-  val f2 = new BlockBranchPrediction
-  val f3 = new BlockBranchPrediction
+  val f1 = new BlockPrediction 
+  val f2 = new BlockPrediction
+  val f3 = new BlockPrediction
+  val f3_meta = UInt(bpdMaxMetaLength.W)
+  val last_stage_entry = new FTBEntry
 }
 
-class BlockBranchPredictionBankUpdate(implicit p: Parameters) extends BoomBundle()(p)
-  with HasBoomFTBParameters
-{
-  val is_mispredict_update     = Bool()
-  val is_repair_update         = Bool()
-
-  val btb_mispredicts  = UInt(BPBankWidth.W)
-  def is_btb_mispredict_update = btb_mispredicts =/= 0.U
-
-  def is_commit_update = !(is_mispredict_update || is_repair_update || is_btb_mispredict_update)
-
-  val pc               = UInt(vaddrBitsExtended.W)
-
-  val br_mask          = UInt(BPBankWidth.W)
-  val cfi_idx          = Valid(UInt(log2Ceil(BPBankWidth).W))
-  val cfi_taken        = Bool()
-  val cfi_mispredicted = Bool()
-
-  val cfi_is_br        = Bool()
-  val cfi_is_jal       = Bool()
-  val cfi_is_jalr      = Bool()
-
-  val ghist            = UInt(globalHistoryLength.W)
-  val lhist            = UInt(localHistoryLength.W)
-
-  val target           = UInt(vaddrBitsExtended.W)
-
-  val meta             = UInt(bpdMaxMetaLength.W)
-}
-
-
-abstract class BlockBranchPredictorBank(implicit p: Parameters) extends BoomModule()(p)
+abstract class BlockPredictorBank(implicit p: Parameters) extends BoomModule()(p)
   with HasBoomFTBParameters
 {
   val metaSz = 0
@@ -361,19 +351,16 @@ abstract class BlockBranchPredictorBank(implicit p: Parameters) extends BoomModu
     val f1_ghist = Input(UInt(globalHistoryLength.W))
     val f1_lhist = Input(UInt(localHistoryLength.W))
 
-    val resp_in = Input(Vec(nInputs, new BlockBranchPredictionBankResponse))
-    val resp = Output(new BlockBranchPredictionBankResponse)
-
-    // Store the meta as a UInt, use width inference to figure out the shape
-    val f3_meta = Output(UInt(bpdMaxMetaLength.W))
+    val resp_in = Input(Vec(nInputs, new BPBankResponse))
+    val resp = Output(new BPBankResponse)
 
     val f3_fire = Input(Bool())
 
-    val update = Input(Valid(new BlockBranchPredictionBankUpdate))
+    val update = Input(Valid(new BPBankUpdate))
   })
   io.resp := io.resp_in(0)
 
-  io.f3_meta := 0.U
+  // io.f3_meta := 0.U
 
   val s0_idx       = fetchIdx(io.f0_pc)
   val s1_idx       = RegNext(s0_idx)
@@ -401,20 +388,18 @@ abstract class BlockBranchPredictorBank(implicit p: Parameters) extends BoomModu
   val s1_update_idx = RegNext(s0_update_idx)
   val s1_update_valid = RegNext(s0_update_valid)
 
-  // bpd.io.resp.ftb_entry := DontCare
 }
 
-class NullBlockBranchPredictorBank(implicit p: Parameters) extends BlockBranchPredictorBank()(p)
+class NullBlockPredictorBank(implicit p: Parameters) extends BlockPredictorBank()(p)
   with HasBoomFTBParameters
 {
   val mems = Nil
-  io.resp := 0.U.asTypeOf(new BlockBranchPredictionBankResponse)
-  io.f3_meta := 0.U
+  io.resp := 0.U.asTypeOf(new BPBankResponse)
 }
 
 
 
-class BlockBranchPredictor(implicit p:Parameters) extends BoomModule()(p)
+class BlockPredictor(implicit p:Parameters) extends BoomModule()(p)
     with HasBoomFTBParameters
 {
 
@@ -424,16 +409,16 @@ class BlockBranchPredictor(implicit p:Parameters) extends BoomModule()(p)
     val f0_req = Input(Valid(new BranchPredictionRequest))
 
     val resp = Output(new Bundle {
-      val f1 = new BlockBranchPredictionBundle
-      val f2 = new BlockBranchPredictionBundle
-      val f3 = new BlockBranchPredictionBundle
+      val f1 = new BlockPredictionBundle
+      val f2 = new BlockPredictionBundle
+      val f3 = new BlockPredictionBundle
       val ftb_entry = new FTBEntry
     })
 
     val f3_fire = Input(Bool())
 
     // Update
-    val update = Input(Valid(new BlockBranchPredictionUpdate))
+    val update = Input(Valid(new BlockUpdate))
   })
 
   val bpdStr = new StringBuilder
@@ -450,7 +435,7 @@ class BlockBranchPredictor(implicit p:Parameters) extends BoomModule()(p)
   override def toString: String = bpdStr.toString
   io.resp.ftb_entry:=DontCare
 
-  val predictors = Module (new NullBlockBranchPredictorBank)
+  val predictors = Module (new NullBlockPredictorBank)
   val lhist_providers = Module(if(localHistoryNSets > 0) new LocalBranchPredictorBank else new NullLocalBranchPredictorBank)
 
   lhist_providers.io.f0_valid := io.f0_req.valid
@@ -463,7 +448,7 @@ class BlockBranchPredictor(implicit p:Parameters) extends BoomModule()(p)
   predictors.io.f1_ghist := RegNext(io.f0_req.bits.ghist.histories(0)) // TODO: 0?
   predictors.io.f1_lhist := lhist_providers.io.f1_lhist
 
-  predictors.io.resp_in(0) := 0.U.asTypeOf(new BlockBranchPredictionBankResponse)
+  predictors.io.resp_in(0) := 0.U.asTypeOf(new BPBankResponse)
 
   //TODO: f3_taken_br
   lhist_providers.io.f3_taken_br := predictors.io.resp.f3.hit_taken_on_br
@@ -471,7 +456,7 @@ class BlockBranchPredictor(implicit p:Parameters) extends BoomModule()(p)
   io.resp.f1.pred := predictors.io.resp.f1
   io.resp.f2.pred := predictors.io.resp.f2
   io.resp.f3.pred := predictors.io.resp.f3
-  io.resp.f3.meta := predictors.io.f3_meta
+  io.resp.f3.meta := predictors.io.resp.f3_meta
   io.resp.f3.lhist := lhist_providers.io.f3_lhist
 
   predictors.io.f3_fire := io.f3_fire
