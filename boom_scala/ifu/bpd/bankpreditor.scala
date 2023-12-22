@@ -406,7 +406,7 @@ class NullBlockBranchPredictorBank(implicit p: Parameters) extends BlockBranchPr
   with HasBoomFTBParameters
 {
   val mems = Nil
-  io.resp := 0.U
+  io.resp := 0.U.asTypeOf(new BlockBranchPredictionBankResponse)
   io.f3_meta := 0.U
 }
 
