@@ -42,7 +42,7 @@ with HasBoomFTBParameters
   //val jalr_target = UInt(vaddrBitsExtended.W) // special path for indirect predictors
   val offsets = Vec(totalSlot, UInt(log2Ceil(predictWidth).W))
   val fallThroughAddr = UInt(vaddrBitsExtended.W)
-  val fallThroughErr = Bool()
+  // val fallThroughErr = Bool()
 
   val is_jal = Bool()
   val is_jalr = Bool()
@@ -165,7 +165,7 @@ with HasBoomFTBParameters
     VecInit(targets :+ fallThroughAddr :+ ((pc+predictBytes.U) & ~((1.U << log2Ceil(predictBytes).U) - 1.U))) //pc + predictBytes then align to predictBytes
   }
 
-  def fallThruError: Bool = hit && fallThroughErr
+  // def fallThruError: Bool = hit && fallThroughErr
 
   def hit_taken_on_jmp =
     !real_slot_taken_mask().init.reduce(_||_) &&
@@ -196,29 +196,31 @@ with HasBoomFTBParameters
 
 
 
-  // def fromFtbEntry(
-  //                   entry: FTBEntry,
-  //                   pc: UInt,
-  //                   last_stage_pc: Option[Tuple2[UInt, Bool]] = None,
-  //                   last_stage_entry: Option[Tuple2[FTBEntry, Bool]] = None
-  //                 ) = {
-  //   slot_valids := entry.brSlots.map(_.valid) :+ entry.tailSlot.valid
-  //   targets := entry.getTargetVec(pc, last_stage_pc) // Use previous stage pc for better timing
-  //   jalr_target := targets.last
-  //   offsets := entry.getOffsetVec
-  //   is_jal := entry.tailSlot.valid && entry.isJal
-  //   is_jalr := entry.tailSlot.valid && entry.isJalr
-  //   is_call := entry.tailSlot.valid && entry.isCall
-  //   is_ret := entry.tailSlot.valid && entry.isRet
-  //   last_may_be_rvi_call := entry.last_may_be_rvi_call
-  //   is_br_sharing := entry.tailSlot.valid && entry.tailSlot.sharing
-  //   predCycle.map(_ := GTimer())
+  def fromFtbEntry(
+                    entry: FTBEntry,
+                    pc: UInt,
+                    last_stage_pc: Option[Tuple2[UInt, Bool]] = None,
+                    last_stage_entry: Option[Tuple2[FTBEntry, Bool]] = None
+                  ) = {
+    slot_valids := entry.brSlots.map(_.valid) :+ entry.tailSlot.valid
+    targets := entry.getTargetVec(pc, last_stage_pc) // Use previous stage pc for better timing
+    // jalr_target := targets.last
+    offsets := entry.getOffsetVec
+    is_jal := entry.tailSlot.valid && entry.isJal
+    is_jalr := entry.tailSlot.valid && entry.isJalr
+    is_call := entry.tailSlot.valid && entry.isCall
+    is_ret := entry.tailSlot.valid && entry.isRet
+    last_may_be_rvi_call := entry.last_may_be_rvi_call
+    is_br_sharing := entry.tailSlot.valid && entry.tailSlot.sharing
+    // predCycle.map(_ := GTimer())
 
-  //   val startLower        = Cat(0.U(1.W),    pc(instOffsetBits+log2Ceil(PredictWidth)-1, instOffsetBits))
-  //   val endLowerwithCarry = Cat(entry.carry, entry.pftAddr)
-  //   fallThroughErr := startLower >= endLowerwithCarry
-  //   fallThroughAddr := Mux(fallThroughErr, pc + (FetchWidth * 4).U, entry.getFallThrough(pc, last_stage_entry))
-  // }
+    val startLower        = Cat(0.U(1.W),    pc(instOffsetBits+log2Ceil(predictWidth)-1, instOffsetBits))
+    val endLowerwithCarry = Cat(entry.carry, entry.pftAddr)
+    assert(!hit || startLower < endLowerwithCarry, "startLower should be less than endLowerwithCarry")
+    // fallThroughErr := startLower >= endLowerwithCarry
+    // fallThroughAddr := Mux(fallThroughErr, pc + (predictWidth * 2).U, entry.getFallThrough(pc, last_stage_entry))
+    fallThroughAddr := Mux(entry.valid, entry.getFallThrough(pc, last_stage_entry), nextFetch(pc))
+  }
 
   // def display(cond: Bool): Unit = {
   //   XSDebug(cond, p"[taken_mask] ${Binary(br_taken_mask.asUInt)} [hit] $hit\n")
