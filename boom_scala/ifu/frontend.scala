@@ -284,7 +284,7 @@ class FetchBundle(implicit p: Parameters) extends BoomBundle
   val fsrc    = UInt(BSRC_SZ.W)
   // Source of the prediction to this bundle
   val tsrc    = UInt(BSRC_SZ.W)
-  //TODO add FTB Entry here to support FTB
+  //TODO: add FTB Entry here to support FTB
   val ftb_entry = new FTBEntry
 }
 
@@ -1093,6 +1093,8 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
 
   nbpd.io.update.valid := bpd_update_arbiter.io.out.valid
   nbpd.io.update.bits := bpd_update_arbiter.io.out.bits
+  nbpd.io.update.bits.ftb_entry := out_entry
+  nbpd.io.update.bits.br_taken_mask := ftbEntryGen.taken_mask
   // nbpd.io.update.bits.is_mispredict_update := bpd_update_arbiter.io.out.bits.is_mispredict_update
   // nbpd.io.update.bits.is_repair_update := bpd_update_arbiter.io.out.bits.is_repair_update
   // nbpd.io.update.bits.btb_mispredicts := bpd_update_arbiter.io.out.bits.btb_mispredicts

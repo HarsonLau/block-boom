@@ -264,6 +264,9 @@ class BPBankUpdate(implicit p: Parameters) extends BoomBundle()(p)
   val target           = UInt(vaddrBitsExtended.W)
 
   val meta             = UInt(bpdMaxMetaLength.W)
+
+  val ftb_entry        = new FTBEntry
+  val br_taken_mask = Vec(numBr, Bool())
 }
 
 class BlockUpdate(implicit p: Parameters) extends BoomBundle()(p)
@@ -296,6 +299,9 @@ class BlockUpdate(implicit p: Parameters) extends BoomBundle()(p)
   val meta             = UInt(bpdMaxMetaLength.W)
 
   val pd = new PredecodeBundle
+
+  val ftb_entry = new FTBEntry
+  val br_taken_mask = Vec(numBr, Bool())
 
   def display(cond: Bool , decimal:Boolean = true, _prefix:chisel3.Printable = p""):Unit={
     val prefix = _prefix + p"BranchPredictionUpdate: "
@@ -337,11 +343,12 @@ class BPBankResponse(implicit p: Parameters) extends BoomBundle()(p)
 
 abstract class BlockPredictorBank(implicit p: Parameters) extends BoomModule()(p)
   with HasBoomFTBParameters
+  with BPUUtils
 {
   val metaSz = 0
   def nInputs = 1
 
-  val mems: Seq[Tuple3[String, Int, Int]]
+  // val mems: Seq[Tuple3[String, Int, Int]]
 
   val io = IO(new Bundle {
     val f0_valid = Input(Bool())
@@ -496,6 +503,9 @@ class BlockPredictor(implicit p:Parameters) extends BoomModule()(p)
   predictors.io.update.bits.btb_mispredicts := io.update.bits.btb_mispredicts
   predictors.io.update.bits.cfi_idx.valid := io.update.bits.cfi_idx.valid
   predictors.io.update.bits.ghist := io.update.bits.ghist.histories(0)
+
+  predictors.io.update.bits.ftb_entry := io.update.bits.ftb_entry
+  predictors.io.update.bits.br_taken_mask := io.update.bits.br_taken_mask
 
   lhist_providers.io.update.valid := io.update.valid && io.update.bits.br_mask =/= 0.U
   lhist_providers.io.update.pc := io.update.bits.pc // TODO: the original impl uses bankAlignPC
