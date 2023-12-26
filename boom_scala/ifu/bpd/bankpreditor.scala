@@ -419,7 +419,7 @@ class BlockPredictor(implicit p:Parameters) extends BoomModule()(p)
       val f1 = new BlockPredictionBundle
       val f2 = new BlockPredictionBundle
       val f3 = new BlockPredictionBundle
-      val ftb_entry = new FTBEntry
+      val last_stage_entry = new FTBEntry
     })
 
     val f3_fire = Input(Bool())
@@ -440,9 +440,9 @@ class BlockPredictor(implicit p:Parameters) extends BoomModule()(p)
   // })
   // bpdStr.append(BoomCoreStringPrefix(f"Total bpd size: ${total_memsize / 1024} KB\n"))
   override def toString: String = bpdStr.toString
-  io.resp.ftb_entry:=DontCare
 
-  val predictors = Module (new NullBlockPredictorBank)
+  // val predictors = Module (new NullBlockPredictorBank)
+  val predictors = Module (new FauFTB)
   val lhist_providers = Module(if(localHistoryNSets > 0) new LocalBranchPredictorBank else new NullLocalBranchPredictorBank)
 
   lhist_providers.io.f0_valid := io.f0_req.valid
@@ -479,6 +479,9 @@ class BlockPredictor(implicit p:Parameters) extends BoomModule()(p)
   io.resp.f2.meta := DontCare
   io.resp.f1.lhist := DontCare
   io.resp.f2.lhist := DontCare
+
+  // ftb entry
+  io.resp.last_stage_entry := predictors.io.resp.last_stage_entry
 
   // Update
   predictors.io.update.bits.is_mispredict_update := io.update.bits.is_mispredict_update

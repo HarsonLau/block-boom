@@ -108,6 +108,10 @@ class FauFTB(implicit p: Parameters) extends BlockPredictorBank with FauFTBParam
   resp_meta.hit := RegEnable(RegEnable(s1_hit, s1_valid), s2_valid)
   resp_meta.pred_way := RegEnable(RegEnable(s1_hit_way, s1_valid), s2_valid)
 
+  // export the ftb entry
+  val s1_hit_ftb_entry = Mux1H(s1_hit_oh, s1_all_entries)
+  io.resp.last_stage_entry := RegEnable(RegEnable(s1_hit_ftb_entry, s1_valid), s2_valid)
+
   // pred update replacer state
   replacer_touch_ways(0).valid := RegNext(s1_valid && s1_hit)
   replacer_touch_ways(0).bits := RegEnable(s1_hit_way, s1_valid && s1_hit)

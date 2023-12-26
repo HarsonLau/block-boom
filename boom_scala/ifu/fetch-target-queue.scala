@@ -142,6 +142,7 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
 
   val pcs      = Reg(Vec(num_entries, UInt(vaddrBitsExtended.W)))
   val pds      = Reg(Vec(num_entries, new PredecodeBundle))
+  val ftb_entries = Reg(Vec(num_entries, new FTBEntry))
   val meta     = SyncReadMem(num_entries,  UInt(bpdMaxMetaLength.W))
   val ram      = Reg(Vec(num_entries, new FTQBundle))
   val ghist    = Seq.fill(2) { SyncReadMem(num_entries, new GlobalHistory) }
@@ -162,6 +163,7 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
 
     pcs(enq_ptr)           := io.enq.bits.pc
     pds(enq_ptr)           := io.enq.bits.pd // for FTB
+    ftb_entries(enq_ptr)   := io.enq.bits.ftb_entry // for FTB
 
     val new_entry = Wire(new FTQBundle)
 
@@ -249,6 +251,7 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
   val bpd_meta  = meta.read(bpd_idx, true.B) // TODO fix these SRAMs
   val bpd_pc    = RegNext(pcs(bpd_idx))
   val bpd_pd    = RegNext(pds(bpd_idx)) // for FTB
+  val bpd_ftb_entry = RegNext(ftb_entries(bpd_idx)) // for FTB
   val bpd_target = RegNext(pcs(WrapInc(bpd_idx, num_entries)))
 
   when (io.redirect.valid) {
@@ -309,6 +312,7 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
     io.bpdupdate.bits.lhist      := bpd_lhist
     io.bpdupdate.bits.meta       := bpd_meta
     io.bpdupdate.bits.pd         := bpd_pd // for FTB
+    io.bpdupdate.bits.ftb_entry  := bpd_ftb_entry // for FTB
     
     // TODO: Add support for FTB update here
 
@@ -338,7 +342,6 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
       redirect_new_entry.cfi_taken        := io.brupdate.b2.taken
       redirect_new_entry.cfi_is_call      := redirect_entry.cfi_is_call && redirect_entry.cfi_idx.bits === new_cfi_idx
       redirect_new_entry.cfi_is_ret       := redirect_entry.cfi_is_ret  && redirect_entry.cfi_idx.bits === new_cfi_idx
-      //TODO: generate new FTB entry here
     }
 
     ras_update     := true.B
