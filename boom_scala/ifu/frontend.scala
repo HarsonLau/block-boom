@@ -284,7 +284,7 @@ class FetchBundle(implicit p: Parameters) extends BoomBundle
   val fsrc    = UInt(BSRC_SZ.W)
   // Source of the prediction to this bundle
   val tsrc    = UInt(BSRC_SZ.W)
-  //TODO: add FTB Entry here to support FTB
+//TODO: add FTB Entry here to support FTB
   val ftb_entry = new FTBEntry
 }
 
@@ -573,6 +573,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
 
   // val f2_correct_f1_ghist = s1_ghist =/= f2_predicted_ghist && enableGHistStallRepair.B
   val n_f2_correct_f1_ghist = s1_ghist =/= n_f2_predicted_ghist && enableGHistStallRepair.B
+  // assert(!n_f2_correct_f1_ghist) //TODO: remove this after adding f2 bp component
 
   when ((s2_valid && !icache.io.resp.valid) ||
         (s2_valid && icache.io.resp.valid && !f3_ready)) {
@@ -885,7 +886,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   f3_fetch_bundle.lhist    := n_f3_bpd_resp.io.deq.bits.lhist
   f3_fetch_bundle.bpd_meta := n_f3_bpd_resp.io.deq.bits.meta
   f3_fetch_bundle.ftb_entry := n_f3_ftb_entry.io.deq.bits
-
+  
   f3_fetch_bundle.end_half.valid := bank_prev_is_half
   f3_fetch_bundle.end_half.bits  := bank_prev_half
 
@@ -972,6 +973,8 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   f4_btb_corrections.io.enq.bits.is_repair_update     := false.B
   f4_btb_corrections.io.enq.bits.btb_mispredicts      := f3_btb_mispredicts.asUInt
   f4_btb_corrections.io.enq.bits.pc                   := f3_fetch_bundle.pc
+  f4_btb_corrections.io.enq.bits.br_mask              := f3_fetch_bundle.br_mask
+  f4_btb_corrections.io.enq.bits.cfi_idx              := f3_fetch_bundle.cfi_idx
   f4_btb_corrections.io.enq.bits.cfi_is_br            := false.B
   f4_btb_corrections.io.enq.bits.cfi_is_jal           := true.B
   f4_btb_corrections.io.enq.bits.cfi_is_jalr          := false.B
@@ -1067,7 +1070,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     ras.io.write_addr  := ftq.io.ras_update_pc
   }
 
-  bpd_update_arbiter.io.out.bits.display(bpd_update_arbiter.io.out.bits.cfi_idx.valid)
+  // bpd_update_arbiter.io.out.bits.display(bpd_update_arbiter.io.out.bits.cfi_idx.valid)
 
   val ftbEntryGen = Module(new FTBEntryGen).io
   ftbEntryGen.start_addr := bpd_update_arbiter.io.out.bits.pc
@@ -1093,10 +1096,10 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   ftbEntryGen.is_br_full := DontCare
 
   val out_entry = ftbEntryGen.new_entry
-  out_entry.display(ftbEntryGen.cfiIndex.valid)
+  // out_entry.display(ftbEntryGen.cfiIndex.valid)
 
   // XSDebug(ftbEntryGen.cfiIndex.valid, p"fall thru: ${Hexadecimal(out_entry.getFallThrough(bpd_update_arbiter.io.out.bits.pc))}\n")
-  XSDebug(ftbEntryGen.cfiIndex.valid, p"FTBEntry: fall-thru: ${out_entry.getFallThrough(bpd_update_arbiter.io.out.bits.pc)}\n")
+  // XSDebug(ftbEntryGen.cfiIndex.valid, p"FTBEntry: fall-thru: ${out_entry.getFallThrough(bpd_update_arbiter.io.out.bits.pc)}\n")
 
   nbpd.io.update.valid := bpd_update_arbiter.io.out.valid
   nbpd.io.update.bits := bpd_update_arbiter.io.out.bits

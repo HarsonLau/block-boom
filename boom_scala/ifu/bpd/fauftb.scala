@@ -15,7 +15,7 @@ import scala.{Tuple2 => &}
 import scala.math.min
 
 trait FauFTBParams extends HasBoomFTBParameters {
-  val numWays = 32
+  val numWays = 32 // note: the uBTB in BOOM has 16 ways
   val tagSize = 16
 
   val TAR_STAT_SZ = 2
@@ -91,7 +91,7 @@ class FauFTB(implicit p: Parameters) extends BlockPredictorBank with FauFTBParam
 
   val s1_all_entries = VecInit(ways.map(_.io.resp))
   for (c & fp & e <- ctrs zip s1_possible_full_preds zip s1_all_entries) {
-    fp.hit := DontCare
+    fp.hit := DontCare // Note: the hit bit will be assigned later
     fp.fromFtbEntry(e, s1_pc)
     for (i <- 0 until numBr) {
       fp.br_taken_mask(i) := c(i)(1) || e.always_taken(i)
@@ -99,9 +99,10 @@ class FauFTB(implicit p: Parameters) extends BlockPredictorBank with FauFTBParam
   }
   val s1_hit_full_pred = Mux1H(s1_hit_oh, s1_possible_full_preds)
   XSError(PopCount(s1_hit_oh) > 1.U, "fauftb has multiple hits!\n")
+  XSDebug(PopCount(s1_hit_oh) > 0.U, "fauftb has hit!\n")
 
   io.resp.f1 := s1_hit_full_pred
-  io.resp.f1.hit := s1_hit
+  io.resp.f1.hit := s1_hit // assign hit bit
 
   // assign metas
   io.resp.f3_meta := resp_meta.asUInt
