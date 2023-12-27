@@ -52,7 +52,8 @@ with HasBoomFTBParameters
   val is_br_sharing = Bool()
 
   // val call_is_rvc = Bool()
-  val hit = Bool()
+  val hit = Bool() // hit must be manually set
+  val blockMask = Vec(predictWidth, Bool())
 
   // val predCycle = if (!env.FPGAPlatform) Some(UInt(64.W)) else None
 
@@ -220,6 +221,8 @@ with HasBoomFTBParameters
     // fallThroughErr := startLower >= endLowerwithCarry
     // fallThroughAddr := Mux(fallThroughErr, pc + (predictWidth * 2).U, entry.getFallThrough(pc, last_stage_entry))
     fallThroughAddr := Mux(entry.valid, entry.getFallThrough(pc, last_stage_entry), nextFetch(pc))
+
+    blockMask := Mux(entry.carry, VecInit((0 until predictWidth).map(i => true.B)), VecInit((0 until predictWidth).map(i => i.U < entry.pftAddr)))
   }
 
   // def display(cond: Bool): Unit = {
