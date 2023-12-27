@@ -33,7 +33,7 @@ class FTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBPara
     val is_br_full = Output(Bool())
   })
   // no mispredictions detected at predecode
-  val hit = io.hit
+  val hit = io.old_entry.valid
   val pd = io.pd
 
   val init_entry = WireInit(0.U.asTypeOf(new FTBEntry))
