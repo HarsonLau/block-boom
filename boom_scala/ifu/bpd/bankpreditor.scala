@@ -222,7 +222,33 @@ with HasBoomFTBParameters
     // fallThroughAddr := Mux(fallThroughErr, pc + (predictWidth * 2).U, entry.getFallThrough(pc, last_stage_entry))
     fallThroughAddr := Mux(entry.valid, entry.getFallThrough(pc, last_stage_entry), nextFetch(pc))
 
-    blockMask := Mux(entry.carry, VecInit((0 until predictWidth).map(i => true.B)), VecInit((0 until predictWidth).map(i => i.U < entry.pftAddr)))
+    blockMask := Mux(entry.carry || !entry.valid, VecInit((0 until predictWidth).map(i => true.B)), VecInit((0 until predictWidth).map(i => i.U < entry.pftAddr)))
+    assert(blockMask.asUInt =/= 0.U, "blockMask should not be zero")
+  }
+
+  def makeDefault(
+                  pc: UInt,
+                  last_stage_pc: Option[Tuple2[UInt, Bool]] = None,
+                  last_stage_entry: Option[Tuple2[FTBEntry, Bool]] = None
+  ) = {
+    br_taken_mask := VecInit(Seq.fill(numBr)(false.B))
+    slot_valids := VecInit(Seq.fill(totalSlot)(false.B))
+    targets := VecInit(Seq.fill(totalSlot)(0.U))
+    // jalr_target := 0.U
+    offsets := VecInit(Seq.fill(totalSlot)(0.U))
+    fallThroughAddr := nextFetch(pc)
+
+    is_jal := false.B
+    is_jalr := false.B
+    is_call := false.B
+    is_ret := false.B
+    last_may_be_rvi_call := false.B
+    is_br_sharing := false.B
+    // predCycle.map(_ := 0.U)
+
+    // fallThroughErr := false.B
+    hit := false.B
+    blockMask := VecInit(Seq.fill(predictWidth)(true.B))
   }
 
   // def display(cond: Bool): Unit = {
@@ -468,6 +494,7 @@ class BlockPredictor(implicit p:Parameters) extends BoomModule()(p)
   io.resp.f3.pred := predictors.io.resp.f3
   io.resp.f3.meta := predictors.io.resp.f3_meta
   io.resp.f3.lhist := lhist_providers.io.f3_lhist
+  assert(io.resp.f3.pred.blockMask.asUInt =/= 0.U, "blockMask should not be zero")
 
   predictors.io.f3_fire := io.f3_fire
   lhist_providers.io.f3_fire := io.f3_fire

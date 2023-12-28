@@ -97,9 +97,11 @@ class FauFTB(implicit p: Parameters) extends BlockPredictorBank with FauFTBParam
       fp.br_taken_mask(i) := c(i)(1) || e.always_taken(i)
     }
   }
-  val s1_hit_full_pred =Mux(PopCount(s1_hit_oh)=/=0.U, Mux1H(s1_hit_oh, s1_possible_full_preds), 0.U.asTypeOf(new BlockPrediction))
+  val empty_pred = Wire(new BlockPrediction)
+  empty_pred.makeDefault(s1_pc)
+  val s1_hit_full_pred =Mux(PopCount(s1_hit_oh)=/=0.U, Mux1H(s1_hit_oh, s1_possible_full_preds), empty_pred)
   XSError(PopCount(s1_hit_oh) > 1.U, "fauftb has multiple hits!\n")
-  XSDebug(PopCount(s1_hit_oh) > 0.U, "fauftb has hit!\n")
+  // XSDebug(PopCount(s1_hit_oh) > 0.U, "fauftb has hit!\n")
 
   io.resp.f1 := s1_hit_full_pred
   io.resp.f1.hit := s1_hit // assign hit bit
@@ -108,12 +110,16 @@ class FauFTB(implicit p: Parameters) extends BlockPredictorBank with FauFTBParam
 
   // assign metas
   io.resp.f3_meta := resp_meta.asUInt
-  resp_meta.hit := RegEnable(RegEnable(s1_hit, s1_valid), s2_valid)
-  resp_meta.pred_way := RegEnable(RegEnable(s1_hit_way, s1_valid), s2_valid)
+  // resp_meta.hit := RegEnable(RegEnable(s1_hit, s1_valid), s2_valid)
+  // resp_meta.pred_way := RegEnable(RegEnable(s1_hit_way, s1_valid), s2_valid)
+  resp_meta.hit := RegNext(RegNext(s1_hit))
+  resp_meta.pred_way := RegNext(RegNext(s1_hit_way))
 
   // export the ftb entry
   val s1_hit_ftb_entry = Mux(s1_hit_oh =/= 0.U, Mux1H(s1_hit_oh, s1_all_entries), 0.U.asTypeOf(new FauFTBEntry))
-  io.resp.last_stage_entry := RegEnable(RegEnable(s1_hit_ftb_entry, s1_valid), s2_valid)
+  // io.resp.last_stage_entry := RegEnable(RegEnable(s1_hit_ftb_entry, s1_valid), s2_valid)
+  io.resp.last_stage_entry := RegNext(RegNext(s1_hit_ftb_entry))
+  assert(io.resp.last_stage_entry.valid === RegNext(RegNext(s1_hit)),"when not hit the ftb entry should be invalid\n")
 
   // pred update replacer state
   replacer_touch_ways(0).valid := RegNext(s1_valid && s1_hit)

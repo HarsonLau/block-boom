@@ -42,6 +42,7 @@ class FrontendResp(implicit p: Parameters) extends BoomBundle()(p) {
   val tsrc = UInt(BSRC_SZ.W)
 }
 
+//TODO: remove dual bank support
 class GlobalHistory(implicit p: Parameters) extends BoomBundle()(p)
   with HasBoomFrontendParameters
 {
@@ -80,6 +81,8 @@ class GlobalHistory(implicit p: Parameters) extends BoomBundle()(p)
   }
   def =/=(other: GlobalHistory): Bool = !(this === other)
 
+  // the addr is used when the branch predictor is dual banked
+  // cfi_is_call and cfi_is_ret are used to update the RAS only
   def update(branches: UInt, cfi_taken: Bool, cfi_is_br: Bool, cfi_idx: UInt,
     cfi_valid: Bool, addr: UInt,
     cfi_is_call: Bool, cfi_is_ret: Bool): GlobalHistory = {
@@ -546,7 +549,6 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   // val f2_targs = f2_bpd_resp.preds.map(_.predicted_pc.bits)
   // val f2_do_redirect = f2_redirects.reduce(_||_) && useBPD.B
   val n_f2_do_redirect = n_f2_bpd_resp.pred.cfiIndex.valid && useBPD.B // FTB
-  assert(!n_f2_do_redirect) //TODO: remove this after adding f2 bp component
   // val f2_predicted_target = Mux(f2_do_redirect,
   //                               f2_targs(f2_redirect_idx),
   //                               nextFetch(s2_vpc))
@@ -573,7 +575,6 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
 
   // val f2_correct_f1_ghist = s1_ghist =/= f2_predicted_ghist && enableGHistStallRepair.B
   val n_f2_correct_f1_ghist = s1_ghist =/= n_f2_predicted_ghist && enableGHistStallRepair.B
-  // assert(!n_f2_correct_f1_ghist) //TODO: remove this after adding f2 bp component
 
   when ((s2_valid && !icache.io.resp.valid) ||
         (s2_valid && icache.io.resp.valid && !f3_ready)) {
@@ -591,6 +592,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
       s2_ghist := n_f2_predicted_ghist
     }
     when ((s1_valid && (s1_vpc =/= n_f2_predicted_target || n_f2_correct_f1_ghist)) || !s1_valid) {
+      assert(false.B, "s1_vpc != n_f2_predicted_target")// TODO: remove this after adding F2 predictors
       f1_clear := true.B
 
       s0_valid     := !((s2_tlb_resp.ae.inst || s2_tlb_resp.pf.inst) && !s2_is_replay)
@@ -651,6 +653,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   n_f3_bpd_resp.io.enq.valid := f3.io.deq.valid && RegNext(f3.io.enq.ready) // FTB
   // f3_bpd_resp.io.enq.bits  := bpd.io.resp.f3
   n_f3_bpd_resp.io.enq.bits := nbpd.io.resp.f3 // FTB
+  assert(nbpd.io.resp.f3.pred.blockMask.asUInt =/= 0.U, "nbpd f3 blockMask is zero") // FTB
   // when (f3_bpd_resp.io.enq.fire()) {
   //   bpd.io.f3_fire := true.B
   // }
@@ -797,16 +800,21 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
       f3_is_rvc(i) := isRVC(bank_insts(w))
 
 
-      bank_mask(w) := f3.io.deq.valid && f3_imemresp.mask(i) && valid && !redirect_found
-      f3_mask  (i) := f3.io.deq.valid && f3_imemresp.mask(i) && valid && !redirect_found
+      assert(n_f3_bpd_resp.io.deq.bits.pred.blockMask.asUInt =/= 0.U) // FTB
+      bank_mask(w) := f3.io.deq.valid && f3_imemresp.mask(i) && valid && !redirect_found && n_f3_bpd_resp.io.deq.bits.pred.blockMask(i) // FTB
+      f3_mask  (i) := f3.io.deq.valid && f3_imemresp.mask(i) && valid && !redirect_found && n_f3_bpd_resp.io.deq.bits.pred.blockMask(i) // FTB
+      // bank_mask(w) := f3.io.deq.valid && f3_imemresp.mask(i) && valid && !redirect_found
+      // f3_mask  (i) := f3.io.deq.valid && f3_imemresp.mask(i) && valid && !redirect_found
       f3_targs (i) := Mux(brsigs.cfi_type === CFI_JALR,
         n_f3_bpd_resp.io.deq.bits.pred.getTarget(i.asUInt, n_f3_bpd_resp.io.deq.bits.pc),// TODO: fix me, use more precise target info
         // f3_bpd_resp.io.deq.bits.preds(i).predicted_pc.bits,
         brsigs.target)
 
       // Flush BTB entries for JALs if we mispredict the target
-      f3_btb_mispredicts(i) := (brsigs.cfi_type === CFI_JAL && valid &&
-        n_f3_bpd_resp.io.deq.bits.pred.validPredict(i.asUInt)&&
+      f3_btb_mispredicts(i) := (brsigs.cfi_type === CFI_JAL && valid && n_f3_bpd_resp.io.deq.bits.pred.blockMask(i) && // FTB
+        // n_f3_bpd_resp.io.deq.bits.pred.validPredict(i.asUInt)&& // Note: In the original implemenation, this is not commented out
+        // But if the BTB doesn't provide the target, which means it fails to identify the inst as a JAL,
+        // so we should fire up an insertion to BTB
         (n_f3_bpd_resp.io.deq.bits.pred.getTarget(i.asUInt, n_f3_bpd_resp.io.deq.bits.pc) =/= brsigs.target)
       )
 
@@ -913,7 +921,11 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
       ras.io.read_addr,
       f3_targs(PriorityEncoder(f3_redirects))
     ),
+    // nextFetch(f3_fetch_bundle.pc) // TODO: use nextFetch or fallThru addr?
+    Mux(n_f3_bpd_resp.io.deq.bits.pred.hit,
+    n_f3_bpd_resp.io.deq.bits.pred.fallThroughAddr,
     nextFetch(f3_fetch_bundle.pc)
+    )
   )
 
   f3_fetch_bundle.next_pc       := f3_predicted_target
@@ -1079,7 +1091,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   ftbEntryGen.cfiIndex.valid := bpd_update_arbiter.io.out.bits.cfi_idx.valid
   ftbEntryGen.cfiIndex.bits := bpd_update_arbiter.io.out.bits.cfi_idx.bits
   ftbEntryGen.target := bpd_update_arbiter.io.out.bits.target
-  ftbEntryGen.hit := false.B //TODO: fixme
+  ftbEntryGen.hit := DontCare
   ftbEntryGen.mispredict_vec := VecInit(Seq.fill(predictWidth)(false.B)) // TODO: fixme
 
   ftbEntryGen.new_entry := DontCare
