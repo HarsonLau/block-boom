@@ -299,7 +299,7 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
     io.bpdupdate.bits.is_repair_update     := RegNext(do_repair_update)
     io.bpdupdate.bits.pc      := bpd_pc   // seems like the fetch bundle's PC
     io.bpdupdate.bits.btb_mispredicts := 0.U
-    io.bpdupdate.bits.br_mask := Mux(bpd_entry.cfi_idx.valid, // TODO: the exact Meaning 
+    io.bpdupdate.bits.br_mask := Mux(bpd_entry.cfi_idx.valid,
       MaskLower(UIntToOH(cfi_idx)) & bpd_entry.br_mask, bpd_entry.br_mask)
     io.bpdupdate.bits.cfi_idx := bpd_entry.cfi_idx
     io.bpdupdate.bits.cfi_mispredicted := bpd_entry.cfi_mispredicted
@@ -307,6 +307,7 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
     io.bpdupdate.bits.target     := bpd_target
     io.bpdupdate.bits.cfi_is_br  := bpd_entry.br_mask(cfi_idx)
     io.bpdupdate.bits.cfi_is_jal := bpd_entry.cfi_type === CFI_JAL || bpd_entry.cfi_type === CFI_JALR
+    assert(!io.bpdupdate.bits.cfi_is_jal || !io.bpdupdate.bits.cfi_is_br, "JAL should not be a branch")
     io.bpdupdate.bits.cfi_is_jalr := bpd_entry.cfi_type === CFI_JALR
     io.bpdupdate.bits.ghist      := bpd_ghist
     io.bpdupdate.bits.lhist      := bpd_lhist
@@ -342,6 +343,7 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
       redirect_new_entry.cfi_taken        := io.brupdate.b2.taken
       redirect_new_entry.cfi_is_call      := redirect_entry.cfi_is_call && redirect_entry.cfi_idx.bits === new_cfi_idx
       redirect_new_entry.cfi_is_ret       := redirect_entry.cfi_is_ret  && redirect_entry.cfi_idx.bits === new_cfi_idx
+      redirect_new_entry.cfi_type         := io.brupdate.b2.cfi_type // fix bug
     }
 
     ras_update     := true.B
