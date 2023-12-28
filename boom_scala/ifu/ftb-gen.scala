@@ -170,6 +170,14 @@ class FTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBPara
   val derived_from_old_entry =
     Mux(is_new_br, old_entry_modified,
       Mux(jalr_target_modified, old_entry_jmp_target_modified, old_entry_always_taken))
+  
+  if(enableFTBGenInternalPrint){
+    val prefix = p"InsideFTBGen: "
+    when(hit){
+      XSDebug(is_new_br, prefix + p"new br inserted\n")
+      XSDebug(jalr_target_modified, prefix + p"jalr target modified\n")
+    }
+  }
 
 
   io.new_entry := Mux(!hit, init_entry, derived_from_old_entry)
