@@ -207,6 +207,14 @@ trait HasBoomFTBParameters extends HasBoomFrontendParameters{
   val predictWidth = fetchWidth
   val predictBytes = fetchBytes
   val instOffsetBits = log2Ceil(coreInstBytes) //corresponds to  `instOffsetBits` in XiangShan
+
+  /* Debug log control */
+  val enableF4FTBGenIOPrint = true // print the input and output of FTBEntryGen in F4
+  val enableFTBGenInternalPrint = false // print the internal signals of FTBEntryGen
+  val enableF4BTBCorrectionInputPrint = true // print the input of BTBCorrection in F4
+  val enableWatchPC = true
+  val enableF3MaskPrint = true
+  val watchPC = 2147492914L
 }
 
 class PredecodeBundle(implicit p: Parameters) extends BoomBundle with HasBoomFTBParameters{
@@ -811,7 +819,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
         brsigs.target)
 
       // Flush BTB entries for JALs if we mispredict the target
-      f3_btb_mispredicts(i) := (brsigs.cfi_type === CFI_JAL && valid && n_f3_bpd_resp.io.deq.bits.pred.blockMask(i) && // FTB
+      f3_btb_mispredicts(i) := (f3_mask(i) && brsigs.cfi_type === CFI_JAL && // FTB
         // n_f3_bpd_resp.io.deq.bits.pred.validPredict(i.asUInt)&& // Note: In the original implemenation, this is not commented out
         // But if the BTB doesn't provide the target, which means it fails to identify the inst as a JAL,
         // so we should fire up an insertion to BTB
@@ -875,10 +883,29 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   }
 
   // for FTB
+  if(enableWatchPC && enableF3MaskPrint){
+    val cond = f3_fetch_bundle.pc === watchPC.asUInt
+    XSDebug(cond,p"-----Watch PC: ${Hexadecimal(watchPC.asUInt)}: ${watchPC.asUInt}-----\n")
+    // print all the masks in binary
+    // f3_mask 
+    XSDebug(cond, p"f3_fetch_bundle.mask: ${Binary(f3_fetch_bundle.mask.asUInt)}\n")
+    XSDebug(cond, p"f3_fetch_bundle.br_mask: ${Binary(f3_fetch_bundle.br_mask.asUInt)}\n")
+    XSDebug(cond, p"f3_redirects: ${Binary(f3_redirects.asUInt)}\n")
+    XSDebug(cond, p"f3_fetch_bundle.cfi_idx: ${f3_fetch_bundle.cfi_idx}\n")
+    XSDebug(cond, p"n_f3_bpd_resp.io.deq.bits.pred.blockMask: ${Binary(n_f3_bpd_resp.io.deq.bits.pred.blockMask.asUInt)}\n")
+    for (i <- 0 until fetchWidth) {
+      XSDebug(cond, p"f3_cfi_types ${i}: ${f3_cfi_types(i)}\n")
+    }
+    XSDebug(cond, p"-------------------------\n")
+  }
   val f3_jmp_mask = f3_mask.asUInt & f3_cfi_types.map(t => t === CFI_JAL || t === CFI_JALR).asUInt 
   val f3_jmp_idx = PriorityEncoder(f3_jmp_mask)
   val f3_jmp_type = f3_cfi_types(f3_jmp_idx)
   f3_fetch_bundle.pd.jmpInfo.valid := f3_jmp_mask.orR
+  when (f3_jmp_idx =/= 0.U && !f3_fetch_bundle.pd.jmpInfo.valid) {
+    XSDebug(p"f3_jmp_mask: ${f3_jmp_mask} jmpInfo.valid: ${f3_jmp_mask.orR} \n")
+    // assert(false.B,"jmp idx not zero but jmpInfo is invalid")
+  }
   f3_fetch_bundle.pd.jmpInfo.bits := VecInit(f3_jmp_type === CFI_JALR, f3_call_mask(f3_jmp_idx), f3_ret_mask(f3_jmp_idx))
   f3_fetch_bundle.pd.brMask := f3_br_mask
   f3_fetch_bundle.pd.jmpOffset := f3_jmp_idx
@@ -996,6 +1023,13 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   f4_btb_corrections.io.enq.bits.pd                   := f3_fetch_bundle.pd
   f4_btb_corrections.io.enq.bits.ftb_entry            := f3_fetch_bundle.ftb_entry
 
+  if(enableF4BTBCorrectionInputPrint){
+    val cond = f4_btb_corrections.io.enq.valid
+    XSDebug(cond, "--------------------f4_btb_corrections.io.enq--------------------\n")
+    f4_btb_corrections.io.enq.bits.display(f4_btb_corrections.io.enq.valid)
+    XSDebug(cond, "-----------------------------------------------------------------\n")
+  }
+
 
   // -------------------------------------------------------
   // **** F4 ****
@@ -1082,7 +1116,21 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     ras.io.write_addr  := ftq.io.ras_update_pc
   }
 
-  // bpd_update_arbiter.io.out.bits.display(bpd_update_arbiter.io.out.bits.cfi_idx.valid)
+  if(enableF4FTBGenIOPrint){
+    val cond = bpd_update_arbiter.io.out.bits.cfi_idx.valid
+    XSDebug(cond, "--------------------bpd_update_arbiter.io.out--------------------\n")
+    bpd_update_arbiter.io.out.bits.ftb_entry.display(cond)
+    bpd_update_arbiter.io.out.bits.display(cond)
+    XSDebug(cond, "-----------------------------------------------------------------\n")
+  }
+
+  when(bpd_update_arbiter.io.out.bits.cfi_idx.valid){
+    val bp_update = bpd_update_arbiter.io.out.bits
+    assert(bp_update.cfi_idx.bits < fetchWidth.U, "cfi_idx is larger than fetchWidth")
+    assert(!bp_update.cfi_is_br || bp_update.pd.brMask(bp_update.cfi_idx.bits), "cfi_is_br is true but brMask is false")
+    assert(!bp_update.cfi_is_jal || bp_update.pd.jmpInfo.valid, "cfi_is_jal is true but jmpInfo is invalid")
+    assert(!bp_update.cfi_is_jal || bp_update.cfi_idx.bits === bp_update.pd.jmpOffset, "cfi_is_jal is true but cfi_idx is not equal to jmpOffset")
+  }
 
   val ftbEntryGen = Module(new FTBEntryGen).io
   ftbEntryGen.start_addr := bpd_update_arbiter.io.out.bits.pc
@@ -1108,7 +1156,9 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   ftbEntryGen.is_br_full := DontCare
 
   val out_entry = ftbEntryGen.new_entry
-  // out_entry.display(ftbEntryGen.cfiIndex.valid)
+  if(enableF4FTBGenIOPrint){
+    out_entry.display(ftbEntryGen.cfiIndex.valid)
+  }
 
   // XSDebug(ftbEntryGen.cfiIndex.valid, p"fall thru: ${Hexadecimal(out_entry.getFallThrough(bpd_update_arbiter.io.out.bits.pc))}\n")
   // XSDebug(ftbEntryGen.cfiIndex.valid, p"FTBEntry: fall-thru: ${out_entry.getFallThrough(bpd_update_arbiter.io.out.bits.pc)}\n")
