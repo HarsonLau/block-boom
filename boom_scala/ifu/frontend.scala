@@ -1002,7 +1002,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   f4_btb_corrections.io.enq.bits  := DontCare
   f4_btb_corrections.io.enq.bits.is_mispredict_update := false.B
   f4_btb_corrections.io.enq.bits.is_repair_update     := false.B
-  f4_btb_corrections.io.enq.bits.btb_mispredicts      := f3_btb_mispredicts.asUInt
+  f4_btb_corrections.io.enq.bits.btb_mispredicts      := f3_btb_mispredicts.asUInt // if update from FTQ, btb_mispredicts should be all zero
   f4_btb_corrections.io.enq.bits.pc                   := f3_fetch_bundle.pc
   f4_btb_corrections.io.enq.bits.br_mask              := f3_fetch_bundle.br_mask
   f4_btb_corrections.io.enq.bits.cfi_idx              := f3_fetch_bundle.cfi_idx
@@ -1014,6 +1014,15 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   f4_btb_corrections.io.enq.bits.meta                 := f3_fetch_bundle.bpd_meta
   f4_btb_corrections.io.enq.bits.pd                   := f3_fetch_bundle.pd
   f4_btb_corrections.io.enq.bits.ftb_entry            := f3_fetch_bundle.ftb_entry
+
+  when(f4_btb_corrections.io.enq.valid){
+    assert(f4_btb_corrections.io.enq.bits.cfi_idx.valid, "when f4_btb_corrections.io.enq.valid, cfi_idx should be valid")
+    assert(f4_btb_corrections.io.enq.bits.cfi_idx.bits < fetchWidth.U, "when f4_btb_corrections.io.enq.valid, cfi_idx should be less than fetchWidth")
+    assert(f4_btb_corrections.io.enq.bits.pd.jmpInfo.valid, "when f4_btb_corrections.io.enq.valid, jmpInfo should be valid")
+    assert(f4_btb_corrections.io.enq.bits.pd.jmpOffset < fetchWidth.U, "when f4_btb_corrections.io.enq.valid, jmpOffset should be less than fetchWidth")
+    assert(f4_btb_corrections.io.enq.bits.pd.jmpOffset === f4_btb_corrections.io.enq.bits.cfi_idx.bits, "when f4_btb_corrections.io.enq.valid, jmpOffset should be equal to cfi_idx")
+    assert(f4_btb_corrections.io.enq.bits.pd.hasJal, "when f4_btb_corrections.io.enq.valid, the predecode info should have jal")
+  }
 
   if(enableF4BTBCorrectionInputPrint){
     val cond = f4_btb_corrections.io.enq.valid
