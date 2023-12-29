@@ -209,12 +209,13 @@ trait HasBoomFTBParameters extends HasBoomFrontendParameters{
   val instOffsetBits = log2Ceil(coreInstBytes) //corresponds to  `instOffsetBits` in XiangShan
 
   /* Debug log control */
-  val enableF4FTBGenIOPrint = true // print the input and output of FTBEntryGen in F4
+  val enableF4FTBGenIOPrint = false // print the input and output of FTBEntryGen in F4
   val enableFTBGenInternalPrint = false // print the internal signals of FTBEntryGen
-  val enableF4BTBCorrectionInputPrint = true // print the input of BTBCorrection in F4
-  val enableWatchPC = true
-  val enableF3MaskPrint = true
+  val enableF4BTBCorrectionInputPrint = false // print the input of BTBCorrection in F4
+  val enableWatchPC = false
+  val enableF3MaskPrint = false
   val enbaleBankPredictorUpdatePrint = false
+  val enableFauFTBInsertionPrint = false // print the insertion infos in FauFTB
   val watchPC = 2147492914L
 }
 
@@ -899,14 +900,11 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     }
     XSDebug(cond, p"-------------------------\n")
   }
+
   val f3_jmp_mask = f3_mask.asUInt & f3_cfi_types.map(t => t === CFI_JAL || t === CFI_JALR).asUInt 
   val f3_jmp_idx = PriorityEncoder(f3_jmp_mask)
   val f3_jmp_type = f3_cfi_types(f3_jmp_idx)
   f3_fetch_bundle.pd.jmpInfo.valid := f3_jmp_mask.orR
-  when (f3_jmp_idx =/= 0.U && !f3_fetch_bundle.pd.jmpInfo.valid) {
-    XSDebug(p"f3_jmp_mask: ${f3_jmp_mask} jmpInfo.valid: ${f3_jmp_mask.orR} \n")
-    // assert(false.B,"jmp idx not zero but jmpInfo is invalid")
-  }
   f3_fetch_bundle.pd.jmpInfo.bits := VecInit(f3_jmp_type === CFI_JALR, f3_call_mask(f3_jmp_idx), f3_ret_mask(f3_jmp_idx))
   f3_fetch_bundle.pd.brMask := f3_br_mask
   f3_fetch_bundle.pd.jmpOffset := f3_jmp_idx
@@ -1158,7 +1156,9 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
 
   val out_entry = ftbEntryGen.new_entry
   if(enableF4FTBGenIOPrint){
+    XSDebug(ftbEntryGen.cfiIndex.valid, p"--------------------ftbEntryGen out entry--------------------\n")
     out_entry.display(ftbEntryGen.cfiIndex.valid)
+    XSDebug(ftbEntryGen.cfiIndex.valid, p"-------------------------------------------------------------\n")
   }
 
   // XSDebug(ftbEntryGen.cfiIndex.valid, p"fall thru: ${Hexadecimal(out_entry.getFallThrough(bpd_update_arbiter.io.out.bits.pc))}\n")

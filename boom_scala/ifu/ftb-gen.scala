@@ -56,7 +56,7 @@ class FTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBPara
   def carryPos = log2Ceil(predictWidth)+instOffsetBits
   def getLower(pc: UInt) = pc(carryPos-1, instOffsetBits)
   // if not hit, establish a new entry
-  init_entry.valid := true.B
+  init_entry.valid := cfi_is_br || entry_has_jmp
   // tag is left for ftb to assign
 
   // case br

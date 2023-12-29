@@ -215,6 +215,10 @@ class FTBEntry(implicit p: Parameters) extends BoomBundle with FTBParams with BP
     VecInit(brSlots.map(_.offset) :+ tailSlot.offset)
   }
 
+  def hasValidSlot = {
+    VecInit(brSlots.map(_.valid) :+ tailSlot.valid).reduce(_||_)
+  }
+
   def display(cond: Bool, decimal: Boolean = true): Unit = {
     // XSDebug(cond, p"-----------FTB entry----------- \n")
     val prefix = p"FTBEntry:"

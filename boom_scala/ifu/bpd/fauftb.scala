@@ -138,10 +138,12 @@ class FauFTB(implicit p: Parameters) extends BlockPredictorBank with FauFTBParam
   val u_s0_hit = u_s0_hit_oh.orR
   val u_s0_br_update_valids =
     VecInit((0 until numBr).map(w =>
+      u.bits.ftb_entry.valid &&
       u.bits.ftb_entry.brValids(w) && u.valid && !u.bits.ftb_entry.always_taken(w) &&
       !(PriorityEncoder(u.bits.br_taken_mask) < w.U)))
 
   // s1
+  val u_s1_pc = RegNext(u.bits.pc)
   val u_s1_valid = RegNext(u.valid)
   val u_s1_tag       = RegEnable(u_s0_tag, u.valid)
   val u_s1_hit_oh    = RegEnable(u_s0_hit_oh, u.valid)
@@ -149,7 +151,15 @@ class FauFTB(implicit p: Parameters) extends BlockPredictorBank with FauFTBParam
   val u_s1_alloc_way = replacer.way
   val u_s1_write_way_oh = Mux(u_s1_hit, u_s1_hit_oh, UIntToOH(u_s1_alloc_way))
   val u_s1_ftb_entry = RegEnable(u.bits.ftb_entry, u.valid)
-  val u_s1_ways_write_valid = VecInit((0 until numWays).map(w => u_s1_write_way_oh(w).asBool && u_s1_valid))
+  val u_s1_ftb_entry_empty = !u_s1_ftb_entry.valid || !u_s1_ftb_entry.hasValidSlot // if the entry is invalid or contains no valid slot
+  if(enableFauFTBInsertionPrint){
+    val cond = u.valid && u_s1_ftb_entry_empty
+    XSDebug(cond, p"-------FauFTB insert entry for PC : ${u_s1_pc}-------\n")
+    u_s1_ftb_entry.display(cond)
+    XSDebug(cond, p"-----------------------------------\n")
+  }
+
+  val u_s1_ways_write_valid = VecInit((0 until numWays).map(w => u_s1_write_way_oh(w).asBool && u_s1_valid && !u_s1_ftb_entry_empty))
   for (w <- 0 until numWays) {
     ways(w).io.write_valid := u_s1_ways_write_valid(w)
     ways(w).io.write_tag   := u_s1_tag
