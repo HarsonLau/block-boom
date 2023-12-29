@@ -200,7 +200,9 @@ trait HasBoomFrontendParameters extends HasL1ICacheParameters
   }
 }
 
-trait HasBoomFTBParameters extends HasBoomFrontendParameters{
+trait HasBoomFTBParameters extends HasBoomFrontendParameters
+with hasFTBDebugConfigs
+{
   val numBr = 2
   val numBrSlot = numBr - 1
   val totalSlot = numBrSlot + 1
@@ -208,15 +210,6 @@ trait HasBoomFTBParameters extends HasBoomFrontendParameters{
   val predictBytes = fetchBytes
   val instOffsetBits = log2Ceil(coreInstBytes) //corresponds to  `instOffsetBits` in XiangShan
 
-  /* Debug log control */
-  val enableF4FTBGenIOPrint = false // print the input and output of FTBEntryGen in F4
-  val enableFTBGenInternalPrint = false // print the internal signals of FTBEntryGen
-  val enableF4BTBCorrectionInputPrint = false // print the input of BTBCorrection in F4
-  val enableWatchPC = false
-  val enableF3MaskPrint = false
-  val enbaleBankPredictorUpdatePrint = false
-  val enableFauFTBInsertionPrint = false // print the insertion infos in FauFTB
-  val watchPC = 2147492914L
 }
 
 class PredecodeBundle(implicit p: Parameters) extends BoomBundle with HasBoomFTBParameters{
