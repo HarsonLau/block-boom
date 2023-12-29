@@ -214,6 +214,7 @@ trait HasBoomFTBParameters extends HasBoomFrontendParameters{
   val enableF4BTBCorrectionInputPrint = true // print the input of BTBCorrection in F4
   val enableWatchPC = true
   val enableF3MaskPrint = true
+  val enbaleBankPredictorUpdatePrint = false
   val watchPC = 2147492914L
 }
 

@@ -354,6 +354,40 @@ class BlockUpdate(implicit p: Parameters) extends BoomBundle()(p)
 
 }
 
+class BlockUpdateInfo(implicit p: Parameters) extends BoomBundle()(p)
+  with HasBoomFTBParameters
+{
+  val is_mispredict_update     = Bool()  // TODO: do we need this?
+  val is_repair_update         = Bool()  // TODO: do we need this?
+
+  val btb_mispredicts  = UInt(BPBankWidth.W)
+  def is_btb_mispredict_update = btb_mispredicts =/= 0.U
+
+  def is_commit_update = !(is_mispredict_update || is_repair_update || is_btb_mispredict_update)
+
+  val pc               = UInt(vaddrBitsExtended.W)
+
+  val br_mask          = UInt(BPBankWidth.W)
+  val cfi_idx          = Valid(UInt(log2Ceil(BPBankWidth).W))
+  val cfi_taken        = Bool()
+  val cfi_mispredicted = Bool()
+
+  // val cfi_is_br        = Bool()
+  // val cfi_is_jal       = Bool()
+  // val cfi_is_jalr      = Bool()
+
+  val ghist            = new GlobalHistory
+  val lhist            = UInt(localHistoryLength.W)
+
+  val target           = UInt(vaddrBitsExtended.W)
+
+  val meta             = UInt(bpdMaxMetaLength.W)
+
+  val pd = new PredecodeBundle
+
+  val ftb_entry = new FTBEntry
+  val br_taken_mask = Vec(numBr, Bool())
+}
 // class BlockBranchPredictionRequest(implicit p: Parameters) extends BoomBundle()(p)
 // {
 //   val pc    = UInt(vaddrBitsExtended.W)
@@ -549,5 +583,10 @@ class BlockPredictor(implicit p:Parameters) extends BoomModule()(p)
     }
   }
 
+  if(enbaleBankPredictorUpdatePrint){
+    XSDebug(io.update.valid,p"-----------------Block Predictor update pc :${io.update.bits.pc}-------------------\n")
+    io.update.bits.ftb_entry.display(io.update.valid)
+    XSDebug(io.update.valid,p"------------------------------------\n")
+  }
 
 }
