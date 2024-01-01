@@ -16,6 +16,6 @@ trait hasFTBDebugConfigs {
   val enableWatchPC = false
   val enableF3MaskPrint = false
   val enbaleBankPredictorUpdatePrint = false
-  val enableFauFTBInsertionPrint = false // print the insertion infos in FauFTB
+  val enableFauFTBInsertionPrint = true // print the insertion infos in FauFTB
   val watchPC = 2147492914L
 }

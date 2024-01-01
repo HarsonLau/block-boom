@@ -153,7 +153,7 @@ class FauFTB(implicit p: Parameters) extends BlockPredictorBank with FauFTBParam
   val u_s1_ftb_entry = RegEnable(u.bits.ftb_entry, u.valid)
   val u_s1_ftb_entry_empty = !u_s1_ftb_entry.valid || !u_s1_ftb_entry.hasValidSlot // if the entry is invalid or contains no valid slot
   if(enableFauFTBInsertionPrint){
-    val cond = u.valid && u_s1_ftb_entry_empty
+    val cond = u.valid && !u_s1_ftb_entry_empty
     XSDebug(cond, p"-------FauFTB insert entry for PC : ${u_s1_pc}-------\n")
     u_s1_ftb_entry.display(cond)
     XSDebug(cond, p"-----------------------------------\n")
