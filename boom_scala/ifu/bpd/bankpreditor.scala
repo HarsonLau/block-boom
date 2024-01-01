@@ -505,7 +505,7 @@ class BlockPredictor(implicit p:Parameters) extends BoomModule()(p)
   override def toString: String = bpdStr.toString
 
   // val predictors = Module (new NullBlockPredictorBank)
-  val predictors = Module (new FauFTB)
+  val predictors = Module (new ComposedBlockPredictorBank)
   val lhist_providers = Module(if(localHistoryNSets > 0) new LocalBranchPredictorBank else new NullLocalBranchPredictorBank)
 
   lhist_providers.io.f0_valid := io.f0_req.valid

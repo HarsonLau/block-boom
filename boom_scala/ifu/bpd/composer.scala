@@ -46,3 +46,37 @@ class ComposedBranchPredictorBank(implicit p: Parameters) extends BranchPredicto
   val mems = components.map(_.mems).flatten
 
 }
+
+class ComposedBlockPredictorBank(implicit p: Parameters) extends BlockPredictorBank()(p)
+{
+
+  val (components, resp) = getNewBPDComponents(io.resp_in(0), p)
+  io.resp := resp
+
+  var metas = 0.U(1.W)
+  var meta_sz = 0
+  for (c <- components) {
+    c.io.f0_valid  := io.f0_valid
+    c.io.f0_pc     := io.f0_pc
+    c.io.f0_mask   := io.f0_mask
+    c.io.f1_ghist  := io.f1_ghist
+    c.io.f1_lhist  := io.f1_lhist
+    c.io.f3_fire   := io.f3_fire
+    if (c.metaSz > 0) {
+      metas = (metas << c.metaSz) | c.io.resp.f3_meta(c.metaSz-1,0) // TODO: ensure this is correct
+    }
+    meta_sz = meta_sz + c.metaSz
+  }
+  require(meta_sz < bpdMaxMetaLength)
+  io.resp.f3_meta := metas
+
+
+  var update_meta = io.update.bits.meta
+  for (c <- components.reverse) {
+    c.io.update := io.update
+    c.io.update.bits.meta := update_meta
+    update_meta = update_meta >> c.metaSz
+  }
+
+  // val mems = components.map(_.mems).flatten
+}

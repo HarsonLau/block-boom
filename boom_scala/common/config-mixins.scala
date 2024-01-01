@@ -130,7 +130,8 @@ class WithNSmallBooms(n: Int = 1, overrideIdOffset: Option[Int] = None) extends 
  * 2-wide BOOM.
  */
 class WithNMediumBooms(n: Int = 1, overrideIdOffset: Option[Int] = None) extends Config(
-  new WithBTBBPD ++ // Default to TAGE-L BPD
+  // new WithBTBBPD ++ // Default to TAGE-L BPD
+  new WithBlockBPD ++
   new Config((site, here, up) => {
     case TilesLocated(InSubsystem) => {
       val prev = up(TilesLocated(InSubsystem), site)
@@ -450,6 +451,43 @@ class WithTAGELBPD extends Config((site, here, up) => {
   }
 })
 
+class WithBlockBPD extends Config((site, here, up) => {
+  case TilesLocated(InSubsystem) => up(TilesLocated(InSubsystem), site) map {
+    case tp: BoomTileAttachParams => tp.copy(tileParams = tp.tileParams.copy(core = tp.tileParams.core.copy(
+      bpdMaxMetaLength = 120,
+      globalHistoryLength = 64,
+      localHistoryLength = 1,
+      localHistoryNSets = 0,
+      branchPredictor = ((resp_in: BranchPredictionBankResponse, p: Parameters) => {
+        val loop = Module(new LoopBranchPredictorBank()(p))
+        val tage = Module(new TageBranchPredictorBank()(p))
+        val btb = Module(new BTBBranchPredictorBank()(p))
+        val bim = Module(new BIMBranchPredictorBank()(p))
+        val ubtb = Module(new FAMicroBTBBranchPredictorBank()(p))
+        val preds = Seq(loop, tage, btb, ubtb, bim)
+        preds.map(_.io := DontCare)
+
+        ubtb.io.resp_in(0)  := resp_in
+        bim.io.resp_in(0)   := ubtb.io.resp
+        btb.io.resp_in(0)   := bim.io.resp
+        tage.io.resp_in(0)  := btb.io.resp
+        loop.io.resp_in(0)  := tage.io.resp
+
+        (preds, loop.io.resp)
+      }),
+      newBranchPredictor = ((resp_in: BPBankResponse, p: Parameters) => {
+        val fauftb = Module(new FauFTB()(p))
+        val preds = Seq(fauftb)
+        preds.map(_.io := DontCare)
+
+        fauftb.io.resp_in(0)  := resp_in
+        
+        (preds, fauftb.io.resp)
+      })
+    )))
+    case other => other
+  }
+})
 class WithBoom2BPD extends Config((site, here, up) => {
   case TilesLocated(InSubsystem) => up(TilesLocated(InSubsystem), site) map {
     case tp: BoomTileAttachParams => tp.copy(tileParams = tp.tileParams.copy(core = tp.tileParams.core.copy(
