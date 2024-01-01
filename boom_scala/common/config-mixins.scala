@@ -477,12 +477,14 @@ class WithBlockBPD extends Config((site, here, up) => {
       }),
       newBranchPredictor = ((resp_in: BPBankResponse, p: Parameters) => {
         val fauftb = Module(new FauFTB()(p))
-        val preds = Seq(fauftb)
+        val bim = Module(new BlockBIM()(p))
+        val preds = Seq(fauftb, bim)
         preds.map(_.io := DontCare)
 
         fauftb.io.resp_in(0)  := resp_in
+        bim.io.resp_in(0)  := fauftb.io.resp
         
-        (preds, fauftb.io.resp)
+        (preds, bim.io.resp)
       })
     )))
     case other => other

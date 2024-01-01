@@ -296,6 +296,13 @@ class BPBankUpdate(implicit p: Parameters) extends BoomBundle()(p)
 
   val ftb_entry        = new FTBEntry
   val br_taken_mask = Vec(numBr, Bool())
+  // val br_committed = Vec(numBr, Bool()) // High only when br valid && br committed // seems not used by any BP in Xiangshan
+  // val jmp_taken = Bool() // seems for ittage
+  val mispred_mask = Vec(numBr+1, Bool()) // seems for tage
+  // val pred_hit = Bool()
+  // val false_hit = Bool()
+  // val new_br_insert_pos = Vec(numBr, Bool()) // seems not used by any BP in Xiangshan
+
 }
 
 class BlockUpdate(implicit p: Parameters) extends BoomBundle()(p)
@@ -432,7 +439,7 @@ abstract class BlockPredictorBank(implicit p: Parameters) extends BoomModule()(p
 
   // io.f3_meta := 0.U
 
-  val s0_idx       = fetchIdx(io.f0_pc)
+  val s0_idx       = blockFetchIdx(io.f0_pc)
   val s1_idx       = RegNext(s0_idx)
   val s2_idx       = RegNext(s1_idx)
   val s3_idx       = RegNext(s2_idx)
@@ -573,6 +580,8 @@ class BlockPredictor(implicit p:Parameters) extends BoomModule()(p)
 
   predictors.io.update.bits.ftb_entry := io.update.bits.ftb_entry
   predictors.io.update.bits.br_taken_mask := io.update.bits.br_taken_mask
+
+  predictors.io.update.bits.mispred_mask := DontCare
 
   lhist_providers.io.update.valid := io.update.valid && io.update.bits.br_mask =/= 0.U
   lhist_providers.io.update.pc := io.update.bits.pc // TODO: the original impl uses bankAlignPC

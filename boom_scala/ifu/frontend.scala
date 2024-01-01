@@ -210,6 +210,7 @@ with hasFTBDebugConfigs
   val predictBytes = fetchBytes
   val instOffsetBits = log2Ceil(coreInstBytes) //corresponds to  `instOffsetBits` in XiangShan
 
+  def blockFetchIdx(addr: UInt) = addr >> instOffsetBits
 }
 
 class PredecodeBundle(implicit p: Parameters) extends BoomBundle with HasBoomFTBParameters{
