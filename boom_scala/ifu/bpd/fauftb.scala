@@ -94,7 +94,7 @@ class FauFTB(implicit p: Parameters) extends BlockPredictorBank with FauFTBParam
     fp.hit := DontCare // Note: the hit bit will be assigned later
     fp.fromFtbEntry(e, s1_pc)
     for (i <- 0 until numBr) {
-      fp.br_taken_mask(i) := c(i)(1) || e.always_taken(i)
+      fp.br_taken_mask(i) := e.validSlots(i) && (c(i)(1) || e.always_taken(i))
     }
   }
   val empty_pred = Wire(new BlockPrediction)
