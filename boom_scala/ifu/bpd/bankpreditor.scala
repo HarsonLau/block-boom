@@ -163,7 +163,7 @@ with HasBoomFTBParameters
   // This exposes internal targets for timing optimization,
   // since usually targets are generated quicker than taken
   def allTarget(pc: UInt): Vec[UInt] = {
-    VecInit(targets :+ fallThroughAddr :+ ((pc+predictBytes.U) & ~((1.U << log2Ceil(predictBytes).U) - 1.U))) //pc + predictBytes then align to predictBytes
+    VecInit(targets :+ fallThroughAddr :+ nextFetch(pc))
   }
 
   // def fallThruError: Bool = hit && fallThroughErr
@@ -251,9 +251,16 @@ with HasBoomFTBParameters
     blockMask := VecInit(Seq.fill(predictWidth)(true.B))
   }
 
-  // def display(cond: Bool): Unit = {
-  //   XSDebug(cond, p"[taken_mask] ${Binary(br_taken_mask.asUInt)} [hit] $hit\n")
-  // }
+  def display(cond: Bool): Unit = {
+    XSDebug(cond, "---BlockPrediction---\n")
+    XSDebug(cond, p"taken_mask: ${Binary(br_taken_mask.asUInt)} hit: $hit\n")
+    XSDebug(cond, p"slot_valids: ${Binary(slot_valids.asUInt)} blockMask: ${Binary(blockMask.asUInt)}\n")
+    XSDebug(cond, p"targets: ${targets}\n")
+    XSDebug(cond, p"offsets: ${offsets}\n")
+    XSDebug(cond, p"fallThroughAddr: ${Hexadecimal(fallThroughAddr)}\n")
+    XSDebug(cond, p"is_jal: $is_jal is_jalr: $is_jalr is_call: $is_call is_ret: $is_ret last_may_be_rvi_call: $last_may_be_rvi_call is_br_sharing: $is_br_sharing\n")
+    XSDebug(cond, "---------------------\n")
+  }
 }
 
 class BlockPredictionBundle(implicit p: Parameters) extends BoomBundle()(p)

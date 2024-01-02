@@ -442,6 +442,13 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   // bpd.io.f0_req.bits.ghist := s0_ghist
   nbpd.io.f0_req.bits.ghist:= s0_ghist
 
+  if(enableF0PCPrint){
+    val cond = s0_valid
+    XSDebug(cond, "-----------------F0 NPC Info-----------------\n")
+    XSDebug(cond, p"pc: 0x${Hexadecimal(s0_vpc)}\n")
+    XSDebug(cond, "---------------------------------------------\n")
+  }
+
   // --------------------------------------------------------
   // **** ICache Access (F1) ****
   //      Translate VPC
@@ -488,6 +495,15 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   
   val n_f1_predicted_target = n_s1_bpd_resp.pred.target(n_s1_bpd_resp.pc) // FTB
 
+  if(enableF1RedirectInfoPrint){
+    val cond = s1_valid
+    XSDebug(cond, "-----------------F1 NPC Info-----------------\n")
+    XSDebug(cond, p"PC: 0x${Hexadecimal(s1_vpc)}\n")
+    XSDebug(cond, p"do_redirect: ${n_f1_do_redirect} cfiIndex: ${n_f1_redirect_idx} NPC: 0x${Hexadecimal(n_f1_predicted_target)}\n")
+    n_s1_bpd_resp.pred.display(cond && n_f1_do_redirect)
+    XSDebug(cond, "---------------------------------------------\n")
+  }
+
   // val f1_predicted_ghist = s1_ghist.update(
   //   s1_bpd_resp.preds.map(p => p.is_br && p.predicted_pc.valid).asUInt & f1_mask,
   //   s1_bpd_resp.preds(f1_redirect_idx).taken && f1_do_redirect,
@@ -523,6 +539,9 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   // --------------------------------------------------------
   // **** ICache Response (F2) ****
   // --------------------------------------------------------
+
+  /* for debug */
+  val previous_bpd_resp = RegNext(n_s1_bpd_resp)
 
   val s2_valid = RegNext(s1_valid && !f1_clear, false.B)
   val s2_vpc   = RegNext(s1_vpc)
@@ -605,11 +624,34 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
       s0_ghist     := n_f2_predicted_ghist
       s2_fsrc      := BSRC_2
       s0_tsrc      := BSRC_2
+      if(enableF2RedirectInfoPrint){
+        val cond = true.B
+        XSDebug(cond, "-----------------F2 NPC Info-----------------\n")
+        XSDebug(cond, p"PC: 0x${Hexadecimal(s2_vpc)}\n")
+        XSDebug(cond, p"do_redirect: ${n_f2_do_redirect} cfiIndex: ${n_f2_redirect_idx} NPC: 0x${Hexadecimal(n_f2_predicted_target)}\n")
+        n_f2_bpd_resp.pred.display(cond)
+        XSDebug(cond, "---------------------------------------------\n")
+      }
     }
   }
   s0_replay_bpd_resp := n_f2_bpd_resp
   s0_replay_resp := s2_tlb_resp
   s0_replay_ppc  := s2_ppc
+
+  if(enableF1vsF2BPRespDiff){
+    // check whether the taken mask of F1 and F2 are the same
+    val f1_br_taken_mask = previous_bpd_resp.pred.br_taken_mask
+    val f2_br_taken_mask = n_f2_bpd_resp.pred.br_taken_mask
+    val diff = VecInit((0 until numBr).map(i => f1_br_taken_mask(i) =/= f2_br_taken_mask(i))).asUInt.orR
+    val cond = s2_valid && f3_ready && diff
+    XSDebug(cond, "-----------------F1 vs F2 BP Resp Diff-----------------\n")
+    XSDebug(cond, p"F2 PC: 0x${Hexadecimal(s2_vpc)} F2 NPC: 0x${Hexadecimal(n_f2_predicted_target)}, S1 PC: 0x${Hexadecimal(s1_vpc)} } \n")
+    XSDebug(cond, p"F1 BPD Resp: \n")
+    previous_bpd_resp.pred.display(cond)
+    XSDebug(cond, p"F2 BPD Resp: \n")
+    n_f2_bpd_resp.pred.display(cond)
+    XSDebug(cond, "--------------------------------------------------------\n")
+  }
 
   // --------------------------------------------------------
   // **** F3 ****
@@ -994,6 +1036,14 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
       s0_tsrc      := BSRC_3
 
       f3_fetch_bundle.fsrc := BSRC_3
+      if(enableF3RedirectInfoPrint){
+        val cond = true.B
+        XSDebug(cond, "-----------------F3 NPC Info-----------------\n")
+        XSDebug(cond, p"PC: 0x${Hexadecimal(f3_fetch_bundle.pc)}\n")
+        XSDebug(cond, p"do_redirect: ${f3_redirects.reduce(_||_)} cfiIndex: ${f3_fetch_bundle.cfi_idx} NPC: 0x${Hexadecimal(f3_predicted_target)}\n")
+        n_f3_bpd_resp.io.deq.bits.pred.display(cond)
+        XSDebug(cond, "---------------------------------------------\n")
+      }
     }
   }
 
@@ -1215,6 +1265,11 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     s0_is_sfence := true.B
 
   }.elsewhen (io.cpu.redirect_flush) {
+    if(enableF5RedirectInfoPrint){
+      XSDebug(true.B, p"-------------------Redirect Flush-------------------\n")
+      XSDebug(true.B, p"redirect to ${Hexadecimal(io.cpu.redirect_pc)}\n")
+      XSDebug(true.B, p"-----------------------------------------------------\n")
+    }
     fb.io.clear := true.B
     f4_clear    := true.B
     f3_clear    := true.B
