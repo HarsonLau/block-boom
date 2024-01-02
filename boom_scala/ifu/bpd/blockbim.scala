@@ -57,7 +57,7 @@ class BlockBIM(params: BlockBIMParams = BlockBIMParams())(implicit p: Parameters
 
   for (w <- 0 until numBr) {
 
-    s2_resp(w)        := s2_valid && s2_req_rdata(w)(1) && !doing_reset
+    s2_resp(w)        := s2_valid && s2_req_rdata(w)(1) && !doing_reset // TODO: FTB entry should be used
     s2_meta.bims(w)   := s2_req_rdata(w)
   }
 
