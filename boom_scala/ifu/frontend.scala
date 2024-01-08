@@ -951,7 +951,12 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     XSDebug(cond, p"f3_fetch_bundle.cfi_idx: ${f3_fetch_bundle.cfi_idx}\n")
     XSDebug(cond, p"n_f3_bpd_resp.io.deq.bits.pred.blockMask: ${Binary(n_f3_bpd_resp.io.deq.bits.pred.blockMask.asUInt)}\n")
     for (i <- 0 until fetchWidth) {
-      XSDebug(cond, p"f3_cfi_types ${i}: ${f3_cfi_types(i)}\n")
+      val cond_CFI_JAL = f3_cfi_types(i) === CFI_JAL
+      val cond_CFI_JALR = f3_cfi_types(i) === CFI_JALR
+      val cond_CFI_BR = f3_cfi_types(i) === CFI_BR
+      XSDebug(cond && cond_CFI_JAL, p"f3_cfi_types ${i}: CFI_JAL\n")
+      XSDebug(cond && cond_CFI_JALR, p"f3_cfi_types ${i}: CFI_JALR\n")
+      XSDebug(cond && cond_CFI_BR, p"f3_cfi_types ${i}: CFI_BR\n")
     }
     XSDebug(cond, p"-------------------------\n")
   }
@@ -991,7 +996,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   }
 
   f3_fetch_bundle.cfi_idx.valid := f3_redirects.reduce(_||_)
-  f3_fetch_bundle.cfi_idx.bits  := PriorityEncoder(f3_redirects)
+  f3_fetch_bundle.cfi_idx.bits  := PriorityEncoder(f3_redirects.asUInt)
 
   f3_fetch_bundle.ras_top := ras.io.read_addr
   // Redirect earlier stages only if the later stage
@@ -1094,6 +1099,22 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     assert(f4_btb_corrections.io.enq.bits.pd.jmpInfo.valid, "when f4_btb_corrections.io.enq.valid, jmpInfo should be valid")
     assert(f4_btb_corrections.io.enq.bits.pd.jmpOffset < fetchWidth.U, "when f4_btb_corrections.io.enq.valid, jmpOffset should be less than fetchWidth")
     assert(f4_btb_corrections.io.enq.bits.pd.jmpOffset === f4_btb_corrections.io.enq.bits.cfi_idx.bits, "when f4_btb_corrections.io.enq.valid, jmpOffset should be equal to cfi_idx")
+    // val cond = f4_btb_corrections.io.enq.bits.pd.jmpOffset =/= f4_btb_corrections.io.enq.bits.cfi_idx.bits
+    // XSDebug(cond, "when f4_btb_corrections.io.enq.valid, jmpOffset should be equal to cfi_idx\n")
+    // XSDebug(cond, p"jmpOffset: ${f4_btb_corrections.io.enq.bits.pd.jmpOffset} cfi_idx: ${f4_btb_corrections.io.enq.bits.cfi_idx.bits}\n")
+    // XSDebug(cond, p"pc: 0x${Hexadecimal(f4_btb_corrections.io.enq.bits.pc)}\n")
+    // XSDebug(cond, p"f3_fetch_bundle.mask: ${Binary(f3_fetch_bundle.mask.asUInt)}\n")
+    // XSDebug(cond, p"f3_fetch_bundle.br_mask: ${Binary(f3_fetch_bundle.br_mask.asUInt)}\n")
+    // XSDebug(cond, p"f3_redirects: ${Binary(f3_redirects.asUInt)}, f3_redirects priority encode ${PriorityEncoder(f3_redirects.asUInt)}\n")
+    // XSDebug(cond, p"n_f3_bpd_resp.io.deq.bits.pred.blockMask: ${Binary(n_f3_bpd_resp.io.deq.bits.pred.blockMask.asUInt)}\n")
+    // for (i <- 0 until fetchWidth) {
+    //   val cond_CFI_JAL = f3_cfi_types(i) === CFI_JAL
+    //   val cond_CFI_JALR = f3_cfi_types(i) === CFI_JALR
+    //   val cond_CFI_BR = f3_cfi_types(i) === CFI_BR
+    //   XSDebug(cond && cond_CFI_JAL, p"f3_cfi_types ${i}: CFI_JAL\n")
+    //   XSDebug(cond && cond_CFI_JALR, p"f3_cfi_types ${i}: CFI_JALR\n")
+    //   XSDebug(cond && cond_CFI_BR, p"f3_cfi_types ${i}: CFI_BR\n")
+    // }
     assert(f4_btb_corrections.io.enq.bits.pd.hasJal, "when f4_btb_corrections.io.enq.valid, the predecode info should have jal")
   }
 

@@ -140,7 +140,7 @@ class WithNMediumBooms(n: Int = 1, overrideIdOffset: Option[Int] = None) extends
         BoomTileAttachParams(
           tileParams = BoomTileParams(
             core = BoomCoreParams(
-              fetchWidth = 4,
+              fetchWidth = 8,
               decodeWidth = 2,
               numRobEntries = 64,
               issueParams = Seq(
@@ -161,7 +161,7 @@ class WithNMediumBooms(n: Int = 1, overrideIdOffset: Option[Int] = None) extends
               DCacheParams(rowBits = site(SystemBusKey).beatBits, nSets=64, nWays=4, nMSHRs=2, nTLBWays=8)
             ),
             icache = Some(
-              ICacheParams(rowBits = site(SystemBusKey).beatBits, nSets=64, nWays=4, fetchBytes=2*4)
+              ICacheParams(rowBits = site(SystemBusKey).beatBits, nSets=64, nWays=4, fetchBytes=2*8)
             ),
             hartId = i + idOffset
           ),

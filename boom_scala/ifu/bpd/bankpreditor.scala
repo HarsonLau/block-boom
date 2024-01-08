@@ -278,15 +278,15 @@ class BPBankUpdate(implicit p: Parameters) extends BoomBundle()(p)
   val is_mispredict_update     = Bool()
   val is_repair_update         = Bool()
 
-  val btb_mispredicts  = UInt(BPBankWidth.W)
+  val btb_mispredicts  = UInt(fetchWidth.W)
   def is_btb_mispredict_update = btb_mispredicts =/= 0.U
 
   def is_commit_update = !(is_mispredict_update || is_repair_update || is_btb_mispredict_update)
 
   val pc               = UInt(vaddrBitsExtended.W)
 
-  val br_mask          = UInt(BPBankWidth.W)
-  val cfi_idx          = Valid(UInt(log2Ceil(BPBankWidth).W))
+  val br_mask          = UInt(fetchWidth.W)
+  val cfi_idx          = Valid(UInt(log2Ceil(fetchWidth).W))
   val cfi_taken        = Bool()
   val cfi_mispredicted = Bool()
 
@@ -324,15 +324,15 @@ class BlockUpdate(implicit p: Parameters) extends BoomBundle()(p)
   val is_mispredict_update     = Bool()
   val is_repair_update         = Bool()
 
-  val btb_mispredicts  = UInt(BPBankWidth.W)
+  val btb_mispredicts  = UInt(fetchWidth.W)
   def is_btb_mispredict_update = btb_mispredicts =/= 0.U
 
   def is_commit_update = !(is_mispredict_update || is_repair_update || is_btb_mispredict_update)
 
   val pc               = UInt(vaddrBitsExtended.W)
 
-  val br_mask          = UInt(BPBankWidth.W)
-  val cfi_idx          = Valid(UInt(log2Ceil(BPBankWidth).W))
+  val br_mask          = UInt(fetchWidth.W)
+  val cfi_idx          = Valid(UInt(log2Ceil(fetchWidth).W))
   val cfi_taken        = Bool()
   val cfi_mispredicted = Bool()
 
@@ -380,15 +380,15 @@ class BlockUpdateInfo(implicit p: Parameters) extends BoomBundle()(p)
   val is_mispredict_update     = Bool()  // TODO: do we need this?
   val is_repair_update         = Bool()  // TODO: do we need this?
 
-  val btb_mispredicts  = UInt(BPBankWidth.W)
+  val btb_mispredicts  = UInt(fetchWidth.W)
   def is_btb_mispredict_update = btb_mispredicts =/= 0.U
 
   def is_commit_update = !(is_mispredict_update || is_repair_update || is_btb_mispredict_update)
 
   val pc               = UInt(vaddrBitsExtended.W)
 
-  val br_mask          = UInt(BPBankWidth.W)
-  val cfi_idx          = Valid(UInt(log2Ceil(BPBankWidth).W))
+  val br_mask          = UInt(fetchWidth.W)
+  val cfi_idx          = Valid(UInt(log2Ceil(fetchWidth).W))
   val cfi_taken        = Bool()
   val cfi_mispredicted = Bool()
 
