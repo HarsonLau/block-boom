@@ -15,7 +15,7 @@ import scala.{Tuple2 => &}
 import scala.math.min
 
 trait FauFTBParams extends HasBoomFTBParameters {
-  val numWays = 32 // note: the uBTB in BOOM has 16 ways
+  val numWays = 64 // note: the uBTB in BOOM has 16 ways
   val tagSize = 16
 
   val TAR_STAT_SZ = 2
