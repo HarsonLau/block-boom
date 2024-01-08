@@ -442,8 +442,10 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   // bpd.io.f0_req.bits.ghist := s0_ghist
   nbpd.io.f0_req.bits.ghist:= s0_ghist
 
-  if(enableF0PCPrint){
-    val cond = s0_valid
+  if(enableF0PCPrint || enableWatchPC){
+    val printCond = s0_valid
+    val watchCond = s0_valid && s0_vpc === watchPC.U
+    val cond = if(enableWatchPC) watchCond else printCond
     XSDebug(cond, "-----------------F0 NPC Info-----------------\n")
     XSDebug(cond, p"pc: 0x${Hexadecimal(s0_vpc)}\n")
     XSDebug(cond, "---------------------------------------------\n")
@@ -495,8 +497,10 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   
   val n_f1_predicted_target = n_s1_bpd_resp.pred.target(n_s1_bpd_resp.pc) // FTB
 
-  if(enableF1RedirectInfoPrint){
-    val cond = s1_valid
+  if(enableF1RedirectInfoPrint || enableWatchPC){
+    val printCond = s1_valid
+    val watchCond = s1_valid && s1_vpc === watchPC.U
+    val cond = if(enableF1RedirectInfoPrint) printCond else watchCond
     XSDebug(cond, "-----------------F1 NPC Info-----------------\n")
     XSDebug(cond, p"PC: 0x${Hexadecimal(s1_vpc)}\n")
     XSDebug(cond, p"do_redirect: ${n_f1_do_redirect} cfiIndex: ${n_f1_redirect_idx} NPC: 0x${Hexadecimal(n_f1_predicted_target)}\n")
@@ -637,6 +641,15 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   s0_replay_bpd_resp := n_f2_bpd_resp
   s0_replay_resp := s2_tlb_resp
   s0_replay_ppc  := s2_ppc
+
+  if(enableWatchPC){
+    val cond = s2_valid && s2_vpc === watchPC.U
+    XSDebug(cond, "-----------------F2 Watch PC Info-----------------\n")
+    XSDebug(cond, p"PC: 0x${Hexadecimal(s2_vpc)}\n")
+    XSDebug(cond, p"do_redirect: ${n_f2_do_redirect} cfiIndex: ${n_f2_redirect_idx} NPC: 0x${Hexadecimal(n_f2_predicted_target)}\n")
+    n_f2_bpd_resp.pred.display(cond)
+    XSDebug(cond, "--------------------------------------------------\n")
+  }
 
   if(enableF1vsF2BPRespDiff){
     // check whether the taken mask of F1 and F2 are the same
@@ -923,7 +936,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   // for FTB
   if(enableWatchPC && enableF3MaskPrint){
     val cond = f3_fetch_bundle.pc === watchPC.asUInt
-    XSDebug(cond,p"-----Watch PC: ${Hexadecimal(watchPC.asUInt)}: ${watchPC.asUInt}-----\n")
+    XSDebug(cond,p"-----F3 masks Watch PC: ${Hexadecimal(watchPC.asUInt)}: ${watchPC.asUInt}-----\n")
     // print all the masks in binary
     // f3_mask 
     XSDebug(cond, p"f3_fetch_bundle.mask: ${Binary(f3_fetch_bundle.mask.asUInt)}\n")
@@ -1036,11 +1049,14 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
       s0_tsrc      := BSRC_3
 
       f3_fetch_bundle.fsrc := BSRC_3
-      if(enableF3RedirectInfoPrint){
-        val cond = true.B
+      if(enableF3RedirectInfoPrint || enableWatchPC){
+        val printCond = f3_redirects.reduce(_||_)
+        val watchCond = f3_fetch_bundle.pc === watchPC.asUInt
+        val cond = if(enableWatchPC) watchCond else printCond
         XSDebug(cond, "-----------------F3 NPC Info-----------------\n")
         XSDebug(cond, p"PC: 0x${Hexadecimal(f3_fetch_bundle.pc)}\n")
         XSDebug(cond, p"do_redirect: ${f3_redirects.reduce(_||_)} cfiIndex: ${f3_fetch_bundle.cfi_idx} NPC: 0x${Hexadecimal(f3_predicted_target)}\n")
+        XSDebug(cond, p"cfi_is_ret: ${f3_fetch_bundle.cfi_is_ret} cfi_is_call: ${f3_fetch_bundle.cfi_is_call}\n")
         n_f3_bpd_resp.io.deq.bits.pred.display(cond)
         XSDebug(cond, "---------------------------------------------\n")
       }
@@ -1075,10 +1091,12 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     assert(f4_btb_corrections.io.enq.bits.pd.hasJal, "when f4_btb_corrections.io.enq.valid, the predecode info should have jal")
   }
 
-  if(enableF4BTBCorrectionInputPrint){
-    val cond = f4_btb_corrections.io.enq.valid
+  if(enableF4BTBCorrectionInputPrint || enableWatchPC){
+    val printCond = f4_btb_corrections.io.enq.valid
+    val watchCond = f4_btb_corrections.io.enq.valid && f4_btb_corrections.io.enq.bits.pc === watchPC.asUInt
+    val cond = if(enableWatchPC) watchCond else printCond
     XSDebug(cond, "--------------------f4_btb_corrections.io.enq--------------------\n")
-    f4_btb_corrections.io.enq.bits.display(f4_btb_corrections.io.enq.valid)
+    f4_btb_corrections.io.enq.bits.display(cond, if(enableWatchPC)false else true)
     XSDebug(cond, "-----------------------------------------------------------------\n")
   }
 
@@ -1168,8 +1186,8 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     ras.io.write_addr  := ftq.io.ras_update_pc
   }
 
-  if(enableF4FTBGenIOPrint){
-    val cond = bpd_update_arbiter.io.out.bits.cfi_idx.valid
+  if(enableF4FTBGenIOPrint || enableWatchPC){
+    val cond = if(enableF4FTBGenIOPrint) bpd_update_arbiter.io.out.bits.cfi_idx.valid else bpd_update_arbiter.io.out.bits.pc === watchPC.asUInt
     XSDebug(cond, "--------------------bpd_update_arbiter.io.out--------------------\n")
     bpd_update_arbiter.io.out.bits.ftb_entry.display(cond)
     bpd_update_arbiter.io.out.bits.display(cond)
@@ -1208,10 +1226,11 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   ftbEntryGen.is_br_full := DontCare
 
   val out_entry = ftbEntryGen.new_entry
-  if(enableF4FTBGenIOPrint){
-    XSDebug(ftbEntryGen.cfiIndex.valid, p"--------------------ftbEntryGen out entry--------------------\n")
-    out_entry.display(ftbEntryGen.cfiIndex.valid)
-    XSDebug(ftbEntryGen.cfiIndex.valid, p"-------------------------------------------------------------\n")
+  if(enableF4FTBGenIOPrint || enableWatchPC){
+    val cond = if(enableF4FTBGenIOPrint) bpd_update_arbiter.io.out.bits.cfi_idx.valid else bpd_update_arbiter.io.out.bits.pc === watchPC.asUInt
+    XSDebug(cond, p"--------------------ftbEntryGen out entry--------------------\n")
+    out_entry.display(cond)
+    XSDebug(cond, p"-------------------------------------------------------------\n")
   }
 
   // XSDebug(ftbEntryGen.cfiIndex.valid, p"fall thru: ${Hexadecimal(out_entry.getFallThrough(bpd_update_arbiter.io.out.bits.pc))}\n")
