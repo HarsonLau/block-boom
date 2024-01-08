@@ -23,7 +23,7 @@ case class BlockTageParams(
   uBitPeriod: Int = 2048
 )
 
-class TageBlockPredictor(params: BlockTageParams = BlockTageParams())(implicit p: Parameters) extends BlockPredictorBank()(p)
+class BlockTage(params: BlockTageParams = BlockTageParams())(implicit p: Parameters) extends BlockPredictorBank()(p)
 {
   val nColumns = numBr
   val tageUBitPeriod = params.uBitPeriod
@@ -149,7 +149,7 @@ class TageBlockPredictor(params: BlockTageParams = BlockTageParams())(implicit p
   when (s1_update.valid && s1_update.bits.is_commit_update && s1_update.bits.cfi_mispredicted && s1_update.bits.cfi_idx.valid) {
     // the Vec mispred_mask is of length numBr + 1
     // extract the first numBr elements 
-    val idx = s1_update.bits.mispredSlotIdx.bits
+    val idx = s1_update.bits.mispredSlotIdx
 
     val allocate = s1_update_meta.allocate(idx)
     when (allocate.valid) {
