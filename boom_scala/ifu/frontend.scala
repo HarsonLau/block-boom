@@ -497,6 +497,12 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   
   val n_f1_predicted_target = n_s1_bpd_resp.pred.target(n_s1_bpd_resp.pc) // FTB
 
+  // when n_f1_do_redirect is true, n_s1_bpd_resp.pred.hit must be true
+  assert(!n_f1_do_redirect || n_s1_bpd_resp.pred.hit, "uftb not hit, but do_redirect is true\n")
+
+  // when n_s1_bpd_resp.pred.hit is false, predicted target must be nextFetch(n_s1_bpd_resp.pc)
+  assert(n_s1_bpd_resp.pred.hit || n_f1_predicted_target === nextFetch(n_s1_bpd_resp.pc), "uftb not hit, but predicted target is not nextFetch(n_s1_bpd_resp.pc)\n")
+
   if(enableF1RedirectInfoPrint || enableWatchPC){
     val printCond = s1_valid
     val watchCond = s1_valid && s1_vpc === watchPC.U
