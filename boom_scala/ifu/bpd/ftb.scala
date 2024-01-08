@@ -183,6 +183,12 @@ class FTBEntry(implicit p: Parameters) extends BoomBundle with FTBParams with BP
     brSlots.map{ s => s.valid && s.offset <= offset } :+
     (tailSlot.valid && tailSlot.offset <= offset && tailSlot.sharing)
 
+  def getSlotIdxfromOffset(offset: UInt) = {
+    val mask = brSlots.map{ s => s.valid && s.offset === offset } :+
+      (tailSlot.valid && tailSlot.offset === offset)
+    PriorityEncoder(mask)
+  }
+
   def getBrRecordedVec(offset: UInt) = {
     VecInit(
       brSlots.map(s => s.valid && s.offset === offset) :+

@@ -310,6 +310,15 @@ class BPBankUpdate(implicit p: Parameters) extends BoomBundle()(p)
   // val false_hit = Bool()
   // val new_br_insert_pos = Vec(numBr, Bool()) // seems not used by any BP in Xiangshan
 
+  def mispredSlotIdx = {
+    val idx = Wire(Valid(UInt(numBr.W)))
+    idx.valid := cfi_mispredicted
+    val offsets = ftb_entry.getOffsetVec
+    val mask = VecInit(offsets.map(_ === cfi_idx.bits))
+    val idx.bits = PriorityEncoder(mask)
+    idx
+  }
+
 }
 
 class BlockUpdate(implicit p: Parameters) extends BoomBundle()(p)
