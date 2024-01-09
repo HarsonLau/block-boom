@@ -140,7 +140,7 @@ class WithNMediumBooms(n: Int = 1, overrideIdOffset: Option[Int] = None) extends
         BoomTileAttachParams(
           tileParams = BoomTileParams(
             core = BoomCoreParams(
-              fetchWidth = 8,
+              fetchWidth = 4,
               decodeWidth = 2,
               numRobEntries = 64,
               issueParams = Seq(
@@ -161,7 +161,7 @@ class WithNMediumBooms(n: Int = 1, overrideIdOffset: Option[Int] = None) extends
               DCacheParams(rowBits = site(SystemBusKey).beatBits, nSets=64, nWays=4, nMSHRs=2, nTLBWays=8)
             ),
             icache = Some(
-              ICacheParams(rowBits = site(SystemBusKey).beatBits, nSets=64, nWays=4, fetchBytes=2*8)
+              ICacheParams(rowBits = site(SystemBusKey).beatBits, nSets=64, nWays=4, fetchBytes=2*4)
             ),
             hartId = i + idOffset
           ),
@@ -477,16 +477,16 @@ class WithBlockBPD extends Config((site, here, up) => {
       }),
       newBranchPredictor = ((resp_in: BPBankResponse, p: Parameters) => {
         val fauftb = Module(new FauFTB()(p))
-        val bim = Module(new BlockBIM()(p))
-        val tage = Module(new BlockTage()(p))
-        val preds = Seq(fauftb, bim, tage)
+        // val bim = Module(new BlockBIM()(p))
+        // val tage = Module(new BlockTage()(p))
+        val preds = Seq(fauftb)
         preds.map(_.io := DontCare)
 
         fauftb.io.resp_in(0)  := resp_in
-        bim.io.resp_in(0)  := fauftb.io.resp
-        tage.io.resp_in(0) := bim.io.resp
+        // bim.io.resp_in(0)  := fauftb.io.resp
+        // tage.io.resp_in(0) := bim.io.resp
         
-        (preds, tage.io.resp)
+        (preds, fauftb.io.resp)
       })
     )))
     case other => other
