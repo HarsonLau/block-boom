@@ -16,6 +16,7 @@ class FTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBPara
     val cfiIndex = Flipped(Valid(UInt(log2Ceil(predictWidth).W)))
     val target = Input(UInt(vaddrBitsExtended.W))
     val hit = Input(Bool())
+    val cfiTaken = Input(Bool())
     val mispredict_vec = Input(Vec(predictWidth, Bool())) // seems this input does not affect the new FTB entry gen
 
     val new_entry = Output(new FTBEntry)
@@ -33,6 +34,17 @@ class FTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBPara
     val is_br_full = Output(Bool())
   })
   // no mispredictions detected at predecode
+
+  if(enableWatchPC){
+    val cond = io.start_addr === watchPC.U && io.cfiIndex.valid
+    XSDebug(cond, p"---------------FTBEntryGen---------------\n")
+    XSDebug(cond, p"start_addr: 0x${Hexadecimal(io.start_addr)}\n")
+    XSDebug(cond, p"target: 0x${Hexadecimal(io.target)}\n")
+    XSDebug(cond, p"cfiIndex: ${io.cfiIndex.bits} valid: ${io.cfiIndex.valid} \n")
+    io.old_entry.display(cond)
+    XSDebug(cond, p"------------------------------------------\n")
+  }
+
   val hit = io.old_entry.valid
   val pd = io.pd
 
@@ -65,6 +77,7 @@ class FTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBPara
     init_br_slot.valid := true.B
     init_br_slot.offset := io.cfiIndex.bits
     init_br_slot.setLowerStatByTarget(io.start_addr, io.target, numBr == 1)
+    assert(init_br_slot.getTarget(io.start_addr) === io.target, "br target not match")
     init_entry.always_taken(0) := true.B // set to always taken on init
   }
 
@@ -73,6 +86,7 @@ class FTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBPara
     init_entry.tailSlot.offset := pd.jmpOffset
     init_entry.tailSlot.valid := new_jmp_is_jal || new_jmp_is_jalr
     init_entry.tailSlot.setLowerStatByTarget(io.start_addr, Mux(cfi_is_jalr, io.target, pd.jalTarget), isShare=false)
+    // assert(init_entry.tailSlot.getTarget(io.start_addr) === Mux(cfi_is_jalr, io.target, pd.jalTarget), "jmp target not match")
   }
 
   //TODO: how's the jmpPft calculated?
@@ -160,7 +174,11 @@ class FTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBPara
   val always_taken_modified_vec = Wire(Vec(numBr, Bool())) // whether modified or not
   for (i <- 0 until numBr) {
     old_entry_always_taken.always_taken(i) :=
-      oe.always_taken(i) && io.cfiIndex.valid && oe.brValids(i) && io.cfiIndex.bits === oe.brOffset(i)
+      oe.always_taken(i) && io.cfiIndex.valid && oe.brValids(i) && io.cfiIndex.bits === oe.brOffset(i) && io.cfiTaken
+    val correctBrTargetCond = io.cfiIndex.valid && oe.brValids(i) && io.cfiIndex.bits === oe.brOffset(i) && io.cfiTaken
+    when(correctBrTargetCond){
+      old_entry_always_taken.allSlotsForBr(i).setLowerStatByTarget(io.start_addr, io.target, i == numBr-1)
+    }    
     always_taken_modified_vec(i) := oe.always_taken(i) && !old_entry_always_taken.always_taken(i)
   }
   val always_taken_modified = always_taken_modified_vec.reduce(_||_)

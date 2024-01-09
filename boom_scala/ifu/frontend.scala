@@ -442,6 +442,8 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   // bpd.io.f0_req.bits.ghist := s0_ghist
   nbpd.io.f0_req.bits.ghist:= s0_ghist
 
+  assert(!s0_valid || s0_vpc =/= 0.U, "s0_vpc is 0\n")
+
   if(enableF0PCPrint || enableWatchPC){
     val printCond = s0_valid
     val watchCond = s0_valid && s0_vpc === watchPC.U
@@ -496,6 +498,8 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   //                               nextFetch(s1_vpc))
   
   val n_f1_predicted_target = n_s1_bpd_resp.pred.target(n_s1_bpd_resp.pc) // FTB
+
+  assert(!s1_valid || n_f1_predicted_target =/= 0.U, "f1_predicted_target is 0\n")
 
   // when n_f1_do_redirect is true, n_s1_bpd_resp.pred.hit must be true
   assert(!n_f1_do_redirect || n_s1_bpd_resp.pred.hit, "uftb not hit, but do_redirect is true\n")
@@ -586,6 +590,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   //                               f2_targs(f2_redirect_idx),
   //                               nextFetch(s2_vpc))
   val n_f2_predicted_target = n_f2_bpd_resp.pred.target(n_f2_bpd_resp.pc) // FTB
+  assert(!s2_valid || n_f2_predicted_target =/= 0.U, "f2_predicted_target is 0\n")
 
   // val f2_predicted_ghist = s2_ghist.update(
   //   f2_bpd_resp.preds.map(p => p.is_br && p.predicted_pc.valid).asUInt & f2_mask,
@@ -625,7 +630,8 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
       s2_ghist := n_f2_predicted_ghist
     }
     when ((s1_valid && (s1_vpc =/= n_f2_predicted_target || n_f2_correct_f1_ghist)) || !s1_valid) {
-      assert(false.B, "s1_vpc != n_f2_predicted_target")// TODO: remove this after adding F2 predictors
+      // assert(false.B, "s1_vpc != n_f2_predicted_target")
+      assert(!s1_valid || s1_vpc === n_f2_predicted_target, "s1_vpc != n_f2_predicted_target")// TODO: remove this after adding F2 predictors
       f1_clear := true.B
 
       s0_valid     := !((s2_tlb_resp.ae.inst || s2_tlb_resp.pf.inst) && !s2_is_replay)
@@ -1066,13 +1072,18 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
         val cond = if(enableWatchPC) watchCond else printCond
         XSDebug(cond, "-----------------F3 NPC Info-----------------\n")
         XSDebug(cond, p"PC: 0x${Hexadecimal(f3_fetch_bundle.pc)}\n")
+        XSDebug(cond, p"s1_vpc: 0x${Hexadecimal(s1_vpc)} s2_vpc: 0x${Hexadecimal(s2_vpc)}, s3_predicted_target: 0x${Hexadecimal(f3_predicted_target)}\n")
         XSDebug(cond, p"do_redirect: ${f3_redirects.reduce(_||_)} cfiIndex: ${f3_fetch_bundle.cfi_idx} NPC: 0x${Hexadecimal(f3_predicted_target)}\n")
+        XSDebug(cond, p"br_mask: ${Binary(f3_fetch_bundle.br_mask.asUInt)}\n")
+        XSDebug(cond, p"cfi_is_br: ${f3_fetch_bundle.br_mask(f3_fetch_bundle.cfi_idx.bits)}\n")
         XSDebug(cond, p"cfi_is_ret: ${f3_fetch_bundle.cfi_is_ret} cfi_is_call: ${f3_fetch_bundle.cfi_is_call}\n")
         n_f3_bpd_resp.io.deq.bits.pred.display(cond)
         XSDebug(cond, "---------------------------------------------\n")
       }
     }
   }
+
+  assert(!(f3.io.deq.valid && f4_ready) || f3_predicted_target =/= 0.U, "f3_predicted_target should not be zero")
 
   // When f3 finds a btb mispredict, queue up a bpd correction update
   val f4_btb_corrections = Module(new Queue(new BlockUpdate, 2)) // TODO: add FTB support here
@@ -1082,6 +1093,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   f4_btb_corrections.io.enq.bits.is_repair_update     := false.B
   f4_btb_corrections.io.enq.bits.btb_mispredicts      := f3_btb_mispredicts.asUInt // if update from FTQ, btb_mispredicts should be all zero
   f4_btb_corrections.io.enq.bits.pc                   := f3_fetch_bundle.pc
+  f4_btb_corrections.io.enq.bits.target               := f3_targs(f3_fetch_bundle.cfi_idx.bits)
   f4_btb_corrections.io.enq.bits.br_mask              := f3_fetch_bundle.br_mask
   f4_btb_corrections.io.enq.bits.cfi_idx              := f3_fetch_bundle.cfi_idx
   f4_btb_corrections.io.enq.bits.cfi_is_br            := false.B
@@ -1233,9 +1245,10 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   ftbEntryGen.start_addr := bpd_update_arbiter.io.out.bits.pc
   ftbEntryGen.old_entry := bpd_update_arbiter.io.out.bits.ftb_entry
   ftbEntryGen.pd := bpd_update_arbiter.io.out.bits.pd
-  ftbEntryGen.cfiIndex.valid := bpd_update_arbiter.io.out.bits.cfi_idx.valid
+  ftbEntryGen.cfiIndex.valid := bpd_update_arbiter.io.out.bits.cfi_idx.valid && bpd_update_arbiter.io.out.valid
   ftbEntryGen.cfiIndex.bits := bpd_update_arbiter.io.out.bits.cfi_idx.bits
   ftbEntryGen.target := bpd_update_arbiter.io.out.bits.target
+  ftbEntryGen.cfiTaken := bpd_update_arbiter.io.out.bits.cfi_taken
   ftbEntryGen.hit := DontCare
   ftbEntryGen.mispredict_vec := VecInit(Seq.fill(predictWidth)(false.B)) // TODO: fixme
 
