@@ -131,6 +131,14 @@ class FauFTB(implicit p: Parameters) extends BlockPredictorBank with FauFTBParam
 
   // s0
   val u = io.update
+  if(enableFauFTBUpdateDetailPrint || enableWatchPC){
+    val printCond = u.valid
+    val watchCond = u.valid && u.bits.pc === watchPC.U
+    val cond = if(enableFauFTBUpdateDetailPrint) printCond else watchCond
+    XSDebug(cond, p"-------FauFTB update entry for PC : ${u.bits.pc}-------\n")
+    u.bits.display(cond)
+    XSDebug(cond, p"-----------------------------------\n")
+  }
   val u_meta = u.bits.meta.asTypeOf(new FauFTBMeta)
   val u_s0_tag = getTag(u.bits.pc)
   ways.foreach(_.io.update_req_tag := u_s0_tag)

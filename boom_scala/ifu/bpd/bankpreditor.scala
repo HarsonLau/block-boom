@@ -255,8 +255,9 @@ with HasBoomFTBParameters
     XSDebug(cond, "---BlockPrediction---\n")
     XSDebug(cond, p"taken_mask: ${Binary(br_taken_mask.asUInt)} hit: $hit\n")
     XSDebug(cond, p"slot_valids: ${Binary(slot_valids.asUInt)} blockMask: ${Binary(blockMask.asUInt)}\n")
-    XSDebug(cond, p"targets: ${targets}\n")
-    XSDebug(cond, p"offsets: ${offsets}\n")
+    for (i <- 0 until totalSlot) {
+      XSDebug(cond, p"slot $i: valid:${slot_valids(i)} target:0x${Hexadecimal(targets(i))} offset:${offsets(i)}\n")
+    }
     XSDebug(cond, p"fallThroughAddr: ${Hexadecimal(fallThroughAddr)}\n")
     XSDebug(cond, p"is_jal: $is_jal is_jalr: $is_jalr is_call: $is_call is_ret: $is_ret last_may_be_rvi_call: $last_may_be_rvi_call is_br_sharing: $is_br_sharing\n")
     XSDebug(cond, "---------------------\n")
@@ -316,6 +317,19 @@ class BPBankUpdate(implicit p: Parameters) extends BoomBundle()(p)
     PriorityEncoder(mask)
   }
 
+  def display(cond: Bool) :Unit = {
+    val prefix = p"BPBankUpdate: "
+    // print the infos in Hexadecimal and Binary format
+    val condFromBTBCorrect = is_btb_mispredict_update
+    val condFromFTQ = is_commit_update
+    XSDebug(cond && condFromFTQ, "-----------------Block Predictor update from FTQ-------------------\n")
+    XSDebug(cond && condFromBTBCorrect, "-----------------Block Predictor update from BTBCorrect-------------------\n")
+    XSDebug(cond, p"pc:0x${Hexadecimal(pc)}, br_mask:${Binary(br_mask)}, cfi_idx.valid:${cfi_idx.valid}, cfi_idx.bits:${cfi_idx.bits} \n")
+    XSDebug(cond, p"cfi_taken:${cfi_taken}, cfi_mispredicted:${cfi_mispredicted}, cfi_is_br:${cfi_is_br}, cfi_is_jal:${cfi_is_jal}, cfi_is_jalr:${cfi_is_jalr}, target:0x${Hexadecimal(target)}\n")
+    ftb_entry.display(cond, false)
+    XSDebug(cond && condFromFTQ, "-------------------------------------------------------------------\n")
+    XSDebug(cond && condFromBTBCorrect, "--------------------------------------------------------------------------\n")
+  }
 }
 
 class BlockUpdate(implicit p: Parameters) extends BoomBundle()(p)
