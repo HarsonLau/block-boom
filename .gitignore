@@ -14,3 +14,6 @@ eval-tage.sh
 gen.sh
 *.log
 *.dump
+*.dump.*
+test.*.riscv
+test.riscv.*
