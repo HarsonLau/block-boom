@@ -1265,6 +1265,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   ftbEntryGen.cfiIndex.bits := bpd_update_arbiter.io.out.bits.cfi_idx.bits
   ftbEntryGen.target := bpd_update_arbiter.io.out.bits.target
   ftbEntryGen.cfiTaken := bpd_update_arbiter.io.out.bits.cfi_taken
+  ftbEntryGen.isF3Correction := bpd_update_arbiter.io.out.bits.btb_mispredicts.orR
   ftbEntryGen.hit := DontCare
   ftbEntryGen.mispredict_vec := VecInit(Seq.fill(predictWidth)(false.B)) // TODO: fixme
 
