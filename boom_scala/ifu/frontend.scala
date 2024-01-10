@@ -507,16 +507,6 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   // when n_s1_bpd_resp.pred.hit is false, predicted target must be nextFetch(n_s1_bpd_resp.pc)
   assert(n_s1_bpd_resp.pred.hit || n_f1_predicted_target === nextFetch(n_s1_bpd_resp.pc), "uftb not hit, but predicted target is not nextFetch(n_s1_bpd_resp.pc)\n")
 
-  if(enableF1RedirectInfoPrint || enableWatchPC){
-    val printCond = s1_valid
-    val watchCond = s1_valid && s1_vpc === watchPC.U
-    val cond = if(enableF1RedirectInfoPrint) printCond else watchCond
-    XSDebug(cond, "-----------------F1 NPC Info-----------------\n")
-    XSDebug(cond, p"PC: 0x${Hexadecimal(s1_vpc)}\n")
-    XSDebug(cond, p"do_redirect: ${n_f1_do_redirect} cfiIndex: ${n_f1_redirect_idx} NPC: 0x${Hexadecimal(n_f1_predicted_target)}\n")
-    n_s1_bpd_resp.pred.display(cond && n_f1_do_redirect)
-    XSDebug(cond, "---------------------------------------------\n")
-  }
 
   // val f1_predicted_ghist = s1_ghist.update(
   //   s1_bpd_resp.preds.map(p => p.is_br && p.predicted_pc.valid).asUInt & f1_mask,
@@ -545,6 +535,18 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     s0_vpc       := n_f1_predicted_target
     s0_ghist     := n_f1_predicted_ghist
     s0_is_replay := false.B
+
+    if(enableF1RedirectInfoPrint || enableWatchPC){
+      val printCond = s1_valid
+      val watchCond = s1_valid && s1_vpc === watchPC.U
+      val cond = if(enableF1RedirectInfoPrint) printCond else watchCond
+      XSDebug(cond, "-----------------F1 NPC Info-----------------\n")
+      XSDebug(cond, p"PC: 0x${Hexadecimal(s1_vpc)}\n")
+      XSDebug(cond, p"do_redirect: ${n_f1_do_redirect} cfiIndex: ${n_f1_redirect_idx} NPC: 0x${Hexadecimal(n_f1_predicted_target)}\n")
+      n_s1_bpd_resp.pred.display(cond && n_f1_do_redirect)
+      XSDebug(cond, "---------------------------------------------\n")
+    }
+
   }
 
   io.cpu.itlb_valid_access := tlb.io.req.valid
@@ -658,6 +660,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     val cond = s2_valid && s2_vpc === watchPC.U
     XSDebug(cond, "-----------------F2 Watch PC Info-----------------\n")
     XSDebug(cond, p"PC: 0x${Hexadecimal(s2_vpc)}\n")
+    XSDebug(cond, p"s0_vpc: 0x${Hexadecimal(s0_vpc)}, s1_vpc: 0x${Hexadecimal(s1_vpc)}, s2_vpc: 0x${Hexadecimal(s2_vpc)}\n")
     XSDebug(cond, p"do_redirect: ${n_f2_do_redirect} cfiIndex: ${n_f2_redirect_idx} NPC: 0x${Hexadecimal(n_f2_predicted_target)}\n")
     n_f2_bpd_resp.pred.display(cond)
     XSDebug(cond, "--------------------------------------------------\n")
