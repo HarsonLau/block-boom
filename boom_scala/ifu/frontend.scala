@@ -1129,6 +1129,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
 
       s0_valid     := !(f3_fetch_bundle.xcpt_pf_if || f3_fetch_bundle.xcpt_ae_if)
       s0_vpc       := f3_predicted_target
+      assert(f3_predicted_target =/= 0.U, "when redirecting, f3_predicted_target should not be zero\n")
       s0_is_replay := false.B
       s0_ghist     := f3_predicted_ghist
       s0_tsrc      := BSRC_3
@@ -1391,6 +1392,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
 
     s0_valid     := false.B
     s0_vpc       := io.cpu.sfence.bits.addr
+    assert(io.cpu.sfence.bits.addr =/= 0.U, "sfence addr should not be zero\n")
     s0_is_replay := false.B
     s0_is_sfence := true.B
 
@@ -1410,6 +1412,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
 
     s0_valid     := io.cpu.redirect_val
     s0_vpc       := io.cpu.redirect_pc
+    assert(io.cpu.redirect_pc =/= 0.U, "redirect_pc should not be zero\n")
     s0_ghist     := io.cpu.redirect_ghist
     s0_tsrc      := BSRC_C
     s0_is_replay := false.B
