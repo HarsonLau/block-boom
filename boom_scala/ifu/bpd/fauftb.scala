@@ -154,6 +154,7 @@ class FauFTB(implicit p: Parameters) extends BlockPredictorBank with FauFTBParam
   // s1
   val u_s1_pc = RegNext(u.bits.pc)
   val u_s1_valid = RegNext(u.valid)
+  val u_s1_commit_valid = RegNext(u.valid && u.bits.is_commit_update)
   val u_s1_tag       = RegEnable(u_s0_tag, u.valid)
   val u_s1_hit_oh    = RegEnable(u_s0_hit_oh, u.valid)
   val u_s1_hit       = RegEnable(u_s0_hit, u.valid)
@@ -191,7 +192,7 @@ class FauFTB(implicit p: Parameters) extends BlockPredictorBank with FauFTBParam
   }
 
   // commit update replacer state
-  replacer_touch_ways(1).valid := u_s1_valid
+  replacer_touch_ways(1).valid := u_s1_commit_valid
   replacer_touch_ways(1).bits  := OHToUInt(u_s1_write_way_oh)
 
   /******** update replacer *********/
