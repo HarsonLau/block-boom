@@ -146,9 +146,10 @@ class FauFTB(implicit p: Parameters) extends BlockPredictorBank with FauFTBParam
   val u_s0_hit = u_s0_hit_oh.orR
   val u_s0_br_update_valids =
     VecInit((0 until numBr).map(w =>
+      u.bits.is_commit_update &&
       u.bits.ftb_entry.valid &&
-      u.bits.ftb_entry.brValids(w) && u.valid && !u.bits.ftb_entry.always_taken(w) &&
-      !(PriorityEncoder(u.bits.br_taken_mask) < w.U)))
+      u.bits.ftb_entry.brValids(w) && u.valid && 
+      !(PriorityEncoder(u.bits.br_taken_mask) < w.U))) // TODO: temporarily disable always taken
 
   // s1
   val u_s1_pc = RegNext(u.bits.pc)
