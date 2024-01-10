@@ -202,7 +202,7 @@ class FTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBPara
 
   io.new_br_insert_pos := new_br_insert_onehot
   io.taken_mask := VecInit((io.new_entry.brOffset zip io.new_entry.brValids).map{
-    case (off, v) => io.cfiIndex.bits === off && io.cfiIndex.valid && v
+    case (off, v) => io.cfiIndex.bits === off && io.cfiIndex.valid && v && io.cfiTaken
   })
   io.jmp_taken := io.new_entry.jmpValid && io.new_entry.tailSlot.offset === io.cfiIndex.bits
   for (i <- 0 until numBr) {
