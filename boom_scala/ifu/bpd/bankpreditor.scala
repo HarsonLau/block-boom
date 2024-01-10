@@ -324,6 +324,8 @@ class BPBankUpdate(implicit p: Parameters) extends BoomBundle()(p)
     val condFromFTQ = is_commit_update
     XSDebug(cond && condFromFTQ, "-----------------Block Predictor update from FTQ-------------------\n")
     XSDebug(cond && condFromBTBCorrect, "-----------------Block Predictor update from BTBCorrect-------------------\n")
+    XSDebug(cond && cfi_is_br && cfi_mispredicted, p"BR Mispredicted Update: PC:0x${Hexadecimal(pc)},cfi_idx: ${cfi_idx}, target:0x${Hexadecimal(target)}\n")
+    XSDebug(cond && !cfi_is_br && cfi_mispredicted, p"JMP Mispredicted Update: PC:0x${Hexadecimal(pc)},cfi_idx: ${cfi_idx}, target:0x${Hexadecimal(target)}, cfi_is_jal:${cfi_is_jal}, cfi_is_jalr:${cfi_is_jalr}\n")
     XSDebug(cond, p"pc:0x${Hexadecimal(pc)}, br_mask:${Binary(br_mask)}, cfi_idx.valid:${cfi_idx.valid}, cfi_idx.bits:${cfi_idx.bits} \n")
     XSDebug(cond, p"cfi_taken:${cfi_taken}, cfi_mispredicted:${cfi_mispredicted}, cfi_is_br:${cfi_is_br}, cfi_is_jal:${cfi_is_jal}, cfi_is_jalr:${cfi_is_jalr}, target:0x${Hexadecimal(target)}\n")
     ftb_entry.display(cond, false)
