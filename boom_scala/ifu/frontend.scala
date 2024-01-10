@@ -528,6 +528,23 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     false.B,
     false.B)
 
+  if(enableWatchPC){
+    val f1_ghist_branches = n_s1_bpd_resp.pred.brMask.asUInt & f1_mask.asUInt
+    val f1_ghist_cfi_taken = n_s1_bpd_resp.pred.real_slot_taken() && n_f1_do_redirect
+    val f1_ghist_cfi_is_br = n_s1_bpd_resp.pred.hit_taken_on_br
+    val f1_ghist_cfi_idx = n_f1_redirect_idx
+    val f1_ghist_cfi_valid = n_f1_do_redirect
+    val f1_ghist_addr = s1_vpc
+    val f1_ghist_is_call = false.B
+    val f1_ghist_is_ret = false.B
+
+    val cond = s1_valid && s1_vpc === watchPC.U
+
+    XSDebug(cond, "-----------------F1 Ghist Info-----------------\n")
+    XSDebug(cond, p"branches: ${Binary(f1_ghist_branches)} cfi_taken: ${f1_ghist_cfi_taken} cfi_is_br: ${f1_ghist_cfi_is_br} cfi_idx: ${f1_ghist_cfi_idx} cfi_valid: ${f1_ghist_cfi_valid} addr: 0x${Hexadecimal(f1_ghist_addr)} is_call: ${f1_ghist_is_call} is_ret: ${f1_ghist_is_ret}\n")
+    XSDebug(cond, "-----------------------------------------------\n")
+  }
+
   when (s1_valid && !s1_tlb_miss) {
     // Stop fetching on fault
     s0_valid     := !(s1_tlb_resp.ae.inst || s1_tlb_resp.pf.inst)
@@ -612,6 +629,23 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     s2_vpc,
     false.B,
     false.B)
+
+  if(enableWatchPC){
+    val f2_ghist_branches = n_f2_bpd_resp.pred.brMask.asUInt & f2_mask.asUInt
+    val f2_ghist_cfi_taken = n_f2_bpd_resp.pred.real_slot_taken() && n_f2_do_redirect
+    val f2_ghist_cfi_is_br = n_f2_bpd_resp.pred.hit_taken_on_br
+    val f2_ghist_cfi_idx = n_f2_redirect_idx
+    val f2_ghist_cfi_valid = n_f2_do_redirect
+    val f2_ghist_addr = s2_vpc
+    val f2_ghist_is_call = false.B
+    val f2_ghist_is_ret = false.B
+
+    val cond = s2_valid && s2_vpc === watchPC.U
+
+    XSDebug(cond, "-----------------F2 Ghist Info-----------------\n")
+    XSDebug(cond, p"branches: ${Binary(f2_ghist_branches)} cfi_taken: ${f2_ghist_cfi_taken} cfi_is_br: ${f2_ghist_cfi_is_br} cfi_idx: ${f2_ghist_cfi_idx} cfi_valid: ${f2_ghist_cfi_valid} addr: 0x${Hexadecimal(f2_ghist_addr)} is_call: ${f2_ghist_is_call} is_ret: ${f2_ghist_is_ret}\n")
+    XSDebug(cond, "-----------------------------------------------\n")
+  }
 
   // val f2_correct_f1_ghist = s1_ghist =/= f2_predicted_ghist && enableGHistStallRepair.B
   val n_f2_correct_f1_ghist = s1_ghist =/= n_f2_predicted_ghist && enableGHistStallRepair.B
@@ -1038,7 +1072,8 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
 
   f3_fetch_bundle.next_pc       := f3_predicted_target
   val f3_predicted_ghist = f3_fetch_bundle.ghist.update(
-    f3_fetch_bundle.br_mask,
+    n_f3_bpd_resp.io.deq.bits.pred.brMask.asUInt & f3_mask.asUInt,
+    // f3_fetch_bundle.br_mask,
     f3_fetch_bundle.cfi_idx.valid,
     f3_fetch_bundle.br_mask(f3_fetch_bundle.cfi_idx.bits),
     f3_fetch_bundle.cfi_idx.bits,
@@ -1047,6 +1082,23 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     f3_fetch_bundle.cfi_is_call,
     f3_fetch_bundle.cfi_is_ret
   )
+
+  if(enableWatchPC){
+    val cond = f3_fetch_bundle.pc === watchPC.asUInt
+
+    val f3_ghist_branches = f3_fetch_bundle.br_mask
+    val f3_ghist_cfi_taken = f3_fetch_bundle.cfi_idx.valid
+    val f3_ghist_cfi_is_br = f3_fetch_bundle.br_mask(f3_fetch_bundle.cfi_idx.bits)
+    val f3_ghist_cfi_idx = f3_fetch_bundle.cfi_idx.bits
+    val f3_ghist_cfi_valid = f3_fetch_bundle.cfi_idx.valid
+    val f3_ghist_addr = f3_fetch_bundle.pc
+    val f3_ghist_is_call = f3_fetch_bundle.cfi_is_call
+    val f3_ghist_is_ret = f3_fetch_bundle.cfi_is_ret
+
+    XSDebug(cond, "-----------------F3 GHist Info-----------------\n")
+    XSDebug(cond, p"branches: ${Binary(f3_ghist_branches.asUInt)}, cfi_taken: ${f3_ghist_cfi_taken}, cfi_is_br: ${f3_ghist_cfi_is_br}, cfi_idx: ${f3_ghist_cfi_idx}, cfi_valid: ${f3_ghist_cfi_valid}, addr: 0x${Hexadecimal(f3_ghist_addr)}, is_call: ${f3_ghist_is_call}, is_ret: ${f3_ghist_is_ret}\n")
+    XSDebug(cond, "-----------------------------------------------\n")
+  }
 
 
   ras.io.write_valid := false.B
@@ -1083,12 +1135,14 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
 
       f3_fetch_bundle.fsrc := BSRC_3
       if(enableF3RedirectInfoPrint || enableWatchPC){
-        val printCond = f3_redirects.reduce(_||_)
+        // val printCond = f3_redirects.reduce(_||_)
+        val printCond = true.B
         val watchCond = f3_fetch_bundle.pc === watchPC.asUInt
         val cond = if(enableWatchPC) watchCond else printCond
         XSDebug(cond, "-----------------F3 NPC Info-----------------\n")
         XSDebug(cond, p"PC: 0x${Hexadecimal(f3_fetch_bundle.pc)}\n")
         XSDebug(cond, p"s1_vpc: 0x${Hexadecimal(s1_vpc)} s2_vpc: 0x${Hexadecimal(s2_vpc)}, s3_predicted_target: 0x${Hexadecimal(f3_predicted_target)}\n")
+        XSDebug(cond, p"s1_valid: ${s1_valid} s2_valid: ${s2_valid} f3_correct_f2_ghist: ${f3_correct_f2_ghist} f3_correct_f1_ghist: ${f3_correct_f1_ghist}\n")
         XSDebug(cond, p"do_redirect: ${f3_redirects.reduce(_||_)} cfiIndex: ${f3_fetch_bundle.cfi_idx} NPC: 0x${Hexadecimal(f3_predicted_target)}\n")
         XSDebug(cond, p"br_mask: ${Binary(f3_fetch_bundle.br_mask.asUInt)}\n")
         XSDebug(cond, p"cfi_is_br: ${f3_fetch_bundle.br_mask(f3_fetch_bundle.cfi_idx.bits)}\n")
