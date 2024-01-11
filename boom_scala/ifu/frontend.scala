@@ -891,13 +891,26 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
         Mux(f3_recorded_cfi_mask(i), bpd_predicted_target, nextFetch(f3_imemresp.pc)), // TODO: fixme for unrecorded JALR
         brsigs.target)
 
-      // Flush BTB entries for JALs if we mispredict the target
-      f3_btb_mispredicts(i) := (f3_mask(i) && brsigs.cfi_type === CFI_JAL && // FTB
-        // n_f3_bpd_resp.io.deq.bits.pred.validPredict(i.asUInt)&& // Note: In the original implemenation, this is not commented out
-        // But if the BTB doesn't provide the target, which means it fails to identify the inst as a JAL,
-        // so we should fire up an insertion to BTB
-        bpd_predicted_target =/= brsigs.target // FTB
+      val jalTargetMispredicted = (
+        f3_mask(i) &&
+        brsigs.cfi_type === CFI_JAL &&
+        n_f3_bpd_resp.io.deq.bits.pred.getTarget(i.asUInt, n_f3_bpd_resp.io.deq.bits.pc) =/= brsigs.target
       )
+
+      val takenBrTargetMispredicted = (
+        f3_mask(i) &&
+        brsigs.cfi_type === CFI_BR && n_f3_bpd_resp.io.deq.bits.pred.is_taken(i.asUInt)&&
+        n_f3_bpd_resp.io.deq.bits.pred.getTarget(i.asUInt, n_f3_bpd_resp.io.deq.bits.pc) =/= brsigs.target
+      )
+      // // Flush BTB entries for JALs if we mispredict the target
+      // f3_btb_mispredicts(i) := (f3_mask(i) && brsigs.cfi_type === CFI_JAL && // FTB
+      //   // n_f3_bpd_resp.io.deq.bits.pred.validPredict(i.asUInt)&& // Note: In the original implemenation, this is not commented out
+      //   // But if the BTB doesn't provide the target, which means it fails to identify the inst as a JAL,
+      //   // so we should fire up an insertion to BTB
+      //   (n_f3_bpd_resp.io.deq.bits.pred.getTarget(i.asUInt, n_f3_bpd_resp.io.deq.bits.pc) =/= brsigs.target)
+      // )
+
+      f3_btb_mispredicts(i) := jalTargetMispredicted || takenBrTargetMispredicted
 
 
       f3_npc_plus4_mask(i) := (if (w == 0) {
@@ -1107,8 +1120,8 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   f4_btb_corrections.io.enq.bits.target               := f3_targs(f3_fetch_bundle.cfi_idx.bits)
   f4_btb_corrections.io.enq.bits.br_mask              := f3_fetch_bundle.br_mask
   f4_btb_corrections.io.enq.bits.cfi_idx              := f3_fetch_bundle.cfi_idx
-  f4_btb_corrections.io.enq.bits.cfi_is_br            := false.B
-  f4_btb_corrections.io.enq.bits.cfi_is_jal           := true.B
+  f4_btb_corrections.io.enq.bits.cfi_is_br            := f3_cfi_types(f3_fetch_bundle.cfi_idx.bits) === CFI_BR
+  f4_btb_corrections.io.enq.bits.cfi_is_jal           := f3_cfi_types(f3_fetch_bundle.cfi_idx.bits) === CFI_JAL
   f4_btb_corrections.io.enq.bits.cfi_is_jalr          := false.B
   f4_btb_corrections.io.enq.bits.ghist                := f3_fetch_bundle.ghist
   f4_btb_corrections.io.enq.bits.lhist                := f3_fetch_bundle.lhist
@@ -1119,9 +1132,9 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   when(f4_btb_corrections.io.enq.valid){
     assert(f4_btb_corrections.io.enq.bits.cfi_idx.valid, "when f4_btb_corrections.io.enq.valid, cfi_idx should be valid")
     assert(f4_btb_corrections.io.enq.bits.cfi_idx.bits < fetchWidth.U, "when f4_btb_corrections.io.enq.valid, cfi_idx should be less than fetchWidth")
-    assert(f4_btb_corrections.io.enq.bits.pd.jmpInfo.valid, "when f4_btb_corrections.io.enq.valid, jmpInfo should be valid")
-    assert(f4_btb_corrections.io.enq.bits.pd.jmpOffset < fetchWidth.U, "when f4_btb_corrections.io.enq.valid, jmpOffset should be less than fetchWidth")
-    assert(f4_btb_corrections.io.enq.bits.pd.jmpOffset === f4_btb_corrections.io.enq.bits.cfi_idx.bits, "when f4_btb_corrections.io.enq.valid, jmpOffset should be equal to cfi_idx")
+    assert(!f4_btb_corrections.io.enq.bits.cfi_is_jal || f4_btb_corrections.io.enq.bits.pd.jmpInfo.valid, "when correct jal target, jmpInfo should be valid")
+    assert(!f4_btb_corrections.io.enq.bits.cfi_is_jal || f4_btb_corrections.io.enq.bits.pd.jmpOffset < fetchWidth.U, "when f4_btb_corrections.io.enq.valid, jmpOffset should be less than fetchWidth")
+    assert(!f4_btb_corrections.io.enq.bits.cfi_is_jal || f4_btb_corrections.io.enq.bits.pd.jmpOffset === f4_btb_corrections.io.enq.bits.cfi_idx.bits, "when f4_btb_corrections.io.enq.valid, jmpOffset should be equal to cfi_idx")
     // val cond = f4_btb_corrections.io.enq.bits.pd.jmpOffset =/= f4_btb_corrections.io.enq.bits.cfi_idx.bits
     // XSDebug(cond, "when f4_btb_corrections.io.enq.valid, jmpOffset should be equal to cfi_idx\n")
     // XSDebug(cond, p"jmpOffset: ${f4_btb_corrections.io.enq.bits.pd.jmpOffset} cfi_idx: ${f4_btb_corrections.io.enq.bits.cfi_idx.bits}\n")
@@ -1138,7 +1151,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     //   XSDebug(cond && cond_CFI_JALR, p"f3_cfi_types ${i}: CFI_JALR\n")
     //   XSDebug(cond && cond_CFI_BR, p"f3_cfi_types ${i}: CFI_BR\n")
     // }
-    assert(f4_btb_corrections.io.enq.bits.pd.hasJal, "when f4_btb_corrections.io.enq.valid, the predecode info should have jal")
+    assert(!f4_btb_corrections.io.enq.bits.cfi_is_jal || f4_btb_corrections.io.enq.bits.pd.hasJal, "when f4_btb_corrections.io.enq.valid, the predecode info should have jal")
   }
 
   if(enableF4BTBCorrectionInputPrint || enableWatchPC){
@@ -1260,6 +1273,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   ftbEntryGen.cfiIndex.bits := bpd_update_arbiter.io.out.bits.cfi_idx.bits
   ftbEntryGen.target := bpd_update_arbiter.io.out.bits.target
   ftbEntryGen.cfiTaken := bpd_update_arbiter.io.out.bits.cfi_taken
+  ftbEntryGen.isF3Correction := bpd_update_arbiter.io.out.bits.btb_mispredicts.orR
   ftbEntryGen.hit := DontCare
   ftbEntryGen.mispredict_vec := VecInit(Seq.fill(predictWidth)(false.B)) // TODO: fixme
 

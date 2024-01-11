@@ -17,6 +17,7 @@ class FTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBPara
     val target = Input(UInt(vaddrBitsExtended.W))
     val hit = Input(Bool())
     val cfiTaken = Input(Bool())
+    val isF3Correction = Input(Bool())
     val mispredict_vec = Input(Vec(predictWidth, Bool())) // seems this input does not affect the new FTB entry gen
 
     val new_entry = Output(new FTBEntry)
@@ -173,12 +174,15 @@ class FTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBPara
   val old_entry_always_taken = WireInit(oe)
   val always_taken_modified_vec = Wire(Vec(numBr, Bool())) // whether modified or not
   for (i <- 0 until numBr) {
-    old_entry_always_taken.always_taken(i) :=
-      oe.always_taken(i) && io.cfiIndex.valid && oe.brValids(i) && io.cfiIndex.bits === oe.brOffset(i) && io.cfiTaken
-    val correctBrTargetCond = io.cfiIndex.valid && oe.brValids(i) && io.cfiIndex.bits === oe.brOffset(i) && io.cfiTaken
-    when(correctBrTargetCond){
-      old_entry_always_taken.allSlotsForBr(i).setLowerStatByTarget(io.start_addr, io.target, i == numBr-1)
-    }    
+    when(io.isF3Correction){
+      val correctBrTargetCond = io.cfiIndex.valid && oe.brValids(i) && io.cfiIndex.bits === oe.brOffset(i)
+      when(correctBrTargetCond){
+        old_entry_always_taken.allSlotsForBr(i).setLowerStatByTarget(io.start_addr, io.target, i == numBr-1)
+      }    
+    }.otherwise{
+      old_entry_always_taken.always_taken(i) :=
+        oe.always_taken(i) && io.cfiIndex.valid && oe.brValids(i) && io.cfiIndex.bits === oe.brOffset(i) && io.cfiTaken
+    }
     always_taken_modified_vec(i) := oe.always_taken(i) && !old_entry_always_taken.always_taken(i)
   }
   val always_taken_modified = always_taken_modified_vec.reduce(_||_)
@@ -202,7 +206,7 @@ class FTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBPara
 
   io.new_br_insert_pos := new_br_insert_onehot
   io.taken_mask := VecInit((io.new_entry.brOffset zip io.new_entry.brValids).map{
-    case (off, v) => io.cfiIndex.bits === off && io.cfiIndex.valid && v
+    case (off, v) => io.cfiIndex.bits === off && io.cfiIndex.valid && v //&& io.cfiTaken
   })
   io.jmp_taken := io.new_entry.jmpValid && io.new_entry.tailSlot.offset === io.cfiIndex.bits
   for (i <- 0 until numBr) {
