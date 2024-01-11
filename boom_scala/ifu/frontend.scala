@@ -94,7 +94,7 @@ class GlobalHistory(implicit p: Parameters) extends BoomBundle()(p)
                                             MaskLower(cfi_idx_oh) & ~Mux(cfi_is_br && cfi_taken, cfi_idx_oh, 0.U(fetchWidth.W)),
                                             ~(0.U(fetchWidth.W)))
 
-    if (nBPBanks == 1) {
+    // if (nBPBanks == 1) {
       // In the single bank case every bank sees the history including the previous bank
       new_history := DontCare
       new_history.current_saw_branch_not_taken := false.B
@@ -102,28 +102,29 @@ class GlobalHistory(implicit p: Parameters) extends BoomBundle()(p)
       new_history.old_history := Mux(cfi_is_br && cfi_taken && cfi_valid   , histories(0) << 1 | 1.U,
                                  Mux(saw_not_taken_branch                  , histories(0) << 1,
                                                                              histories(0)))
-    } else {
-      // In the two bank case every bank ignore the history added by the previous bank
-      val base = histories(1)
-      val cfi_in_bank_0 = cfi_valid && cfi_taken && cfi_idx_fixed < BPBankWidth.U
-      val ignore_second_bank = cfi_in_bank_0 || mayNotBeDualBanked(addr)
+    // } 
+    // else {
+    //   // In the two bank case every bank ignore the history added by the previous bank
+    //   val base = histories(1)
+    //   val cfi_in_bank_0 = cfi_valid && cfi_taken && cfi_idx_fixed < BPBankWidth.U
+    //   val ignore_second_bank = cfi_in_bank_0 || mayNotBeDualBanked(addr)
 
-      val first_bank_saw_not_taken = not_taken_branches(BPBankWidth - 1,0) =/= 0.U || current_saw_branch_not_taken
-      new_history.current_saw_branch_not_taken := false.B
-      when (ignore_second_bank) {
-        new_history.old_history := histories(1)
-        new_history.new_saw_branch_not_taken := first_bank_saw_not_taken
-        new_history.new_saw_branch_taken     := cfi_is_br && cfi_in_bank_0
-      } .otherwise {
-        new_history.old_history := Mux(cfi_is_br && cfi_in_bank_0                             , histories(1) << 1 | 1.U,
-                                   Mux(first_bank_saw_not_taken                               , histories(1) << 1,
-                                                                                                histories(1)))
+    //   val first_bank_saw_not_taken = not_taken_branches(BPBankWidth - 1,0) =/= 0.U || current_saw_branch_not_taken
+    //   new_history.current_saw_branch_not_taken := false.B
+    //   when (ignore_second_bank) {
+    //     new_history.old_history := histories(1)
+    //     new_history.new_saw_branch_not_taken := first_bank_saw_not_taken
+    //     new_history.new_saw_branch_taken     := cfi_is_br && cfi_in_bank_0
+    //   } .otherwise {
+    //     new_history.old_history := Mux(cfi_is_br && cfi_in_bank_0                             , histories(1) << 1 | 1.U,
+    //                                Mux(first_bank_saw_not_taken                               , histories(1) << 1,
+    //                                                                                             histories(1)))
 
-        new_history.new_saw_branch_not_taken := not_taken_branches(fetchWidth-1, BPBankWidth) =/= 0.U
-        new_history.new_saw_branch_taken     := cfi_valid && cfi_taken && cfi_is_br && !cfi_in_bank_0
+    //     new_history.new_saw_branch_not_taken := not_taken_branches(fetchWidth-1, BPBankWidth) =/= 0.U
+    //     new_history.new_saw_branch_taken     := cfi_valid && cfi_taken && cfi_is_br && !cfi_in_bank_0
 
-      }
-    }
+    //   }
+    // }
     new_history.ras_idx := Mux(cfi_valid && cfi_is_call, WrapInc(ras_idx, nRasEntries),
                            Mux(cfi_valid && cfi_is_ret , WrapDec(ras_idx, nRasEntries), ras_idx))
     new_history
@@ -543,6 +544,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     s0_valid     := !(s1_tlb_resp.ae.inst || s1_tlb_resp.pf.inst)
     s0_tsrc      := BSRC_1
     s0_vpc       := n_f1_predicted_target
+    assert(n_f1_predicted_target =/= 0.U, "f1_predicted_target is 0\n")
     s0_ghist     := n_f1_predicted_ghist
     s0_is_replay := false.B
   }
@@ -635,6 +637,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
       f1_clear := true.B
 
       s0_valid     := !((s2_tlb_resp.ae.inst || s2_tlb_resp.pf.inst) && !s2_is_replay)
+      assert(n_f2_predicted_target =/= 0.U, "f2_predicted_target is 0\n")
       s0_vpc       := n_f2_predicted_target
       s0_is_replay := false.B
       s0_ghist     := n_f2_predicted_ghist
@@ -768,6 +771,13 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   f3_fetch_bundle.tsrc := f3_imemresp.tsrc
   f3_fetch_bundle.shadowed_mask := f3_shadowed_mask
 
+  val f3_recorded_cfi_mask = Wire(Vec(fetchWidth, Bool()))
+  for(i <- 0 until fetchWidth) {
+    f3_recorded_cfi_mask(i) := n_f3_bpd_resp.io.deq.bits.pred.validPredict(i.U)
+  }
+  val f3_block_mask = n_f3_bpd_resp.io.deq.bits.pred.blockMask
+  assert(f3_block_mask.asUInt =/= 0.U, "nbpd f3 blockMask is zero") // FTB
+
   // Tracks trailing 16b of previous fetch packet
   val f3_prev_half    = Reg(UInt(16.W))
   // Tracks if last fetchpacket contained a half-inst
@@ -871,14 +881,14 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
       f3_is_rvc(i) := isRVC(bank_insts(w))
 
 
-      assert(n_f3_bpd_resp.io.deq.bits.pred.blockMask.asUInt =/= 0.U) // FTB
-      bank_mask(w) := f3.io.deq.valid && f3_imemresp.mask(i) && valid && !redirect_found && n_f3_bpd_resp.io.deq.bits.pred.blockMask(i) // FTB
-      f3_mask  (i) := f3.io.deq.valid && f3_imemresp.mask(i) && valid && !redirect_found && n_f3_bpd_resp.io.deq.bits.pred.blockMask(i) // FTB
+      assert(f3_block_mask.asUInt =/= 0.U) // FTB
+      bank_mask(w) := f3.io.deq.valid && f3_imemresp.mask(i) && valid && !redirect_found && f3_block_mask(i) // FTB
+      f3_mask  (i) := f3.io.deq.valid && f3_imemresp.mask(i) && valid && !redirect_found && f3_block_mask(i) // FTB
       // bank_mask(w) := f3.io.deq.valid && f3_imemresp.mask(i) && valid && !redirect_found
       // f3_mask  (i) := f3.io.deq.valid && f3_imemresp.mask(i) && valid && !redirect_found
+      val bpd_predicted_target = n_f3_bpd_resp.io.deq.bits.pred.getTarget(i.asUInt, n_f3_bpd_resp.io.deq.bits.pc) // FTB
       f3_targs (i) := Mux(brsigs.cfi_type === CFI_JALR,
-        n_f3_bpd_resp.io.deq.bits.pred.getTarget(i.asUInt, n_f3_bpd_resp.io.deq.bits.pc),// TODO: fix me, use more precise target info
-        // f3_bpd_resp.io.deq.bits.preds(i).predicted_pc.bits,
+        Mux(f3_recorded_cfi_mask(i), bpd_predicted_target, nextFetch(f3_imemresp.pc)), // TODO: fixme for unrecorded JALR
         brsigs.target)
 
       // Flush BTB entries for JALs if we mispredict the target
@@ -886,7 +896,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
         // n_f3_bpd_resp.io.deq.bits.pred.validPredict(i.asUInt)&& // Note: In the original implemenation, this is not commented out
         // But if the BTB doesn't provide the target, which means it fails to identify the inst as a JAL,
         // so we should fire up an insertion to BTB
-        (n_f3_bpd_resp.io.deq.bits.pred.getTarget(i.asUInt, n_f3_bpd_resp.io.deq.bits.pc) =/= brsigs.target)
+        bpd_predicted_target =/= brsigs.target // FTB
       )
 
 
@@ -1009,7 +1019,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   // can consume this packet
 
   val f3_predicted_target = Mux(f3_redirects.reduce(_||_),
-    Mux(f3_fetch_bundle.cfi_is_ret && useBPD.B && useRAS.B,
+    Mux(f3_fetch_bundle.cfi_is_ret && useBPD.B && useRAS.B && ras.io.read_addr =/= 0.U,
       ras.io.read_addr,
       f3_targs(PriorityEncoder(f3_redirects))
     ),
@@ -1061,6 +1071,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
 
       s0_valid     := !(f3_fetch_bundle.xcpt_pf_if || f3_fetch_bundle.xcpt_ae_if)
       s0_vpc       := f3_predicted_target
+      assert(f3_predicted_target =/= 0.U, "f3_predicted_target is 0\n")
       s0_is_replay := false.B
       s0_ghist     := f3_predicted_ghist
       s0_tsrc      := BSRC_3

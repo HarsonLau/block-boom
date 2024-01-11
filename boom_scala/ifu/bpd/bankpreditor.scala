@@ -321,7 +321,7 @@ class BPBankUpdate(implicit p: Parameters) extends BoomBundle()(p)
     val prefix = p"BPBankUpdate: "
     // print the infos in Hexadecimal and Binary format
     val condFromBTBCorrect = is_btb_mispredict_update
-    val condFromFTQ = is_commit_update
+    val condFromFTQ = !is_btb_mispredict_update && ftb_entry.valid
     XSDebug(cond && condFromFTQ, "-----------------Block Predictor update from FTQ-------------------\n")
     XSDebug(cond && condFromBTBCorrect, "-----------------Block Predictor update from BTBCorrect-------------------\n")
     XSDebug(cond, p"pc:0x${Hexadecimal(pc)}, br_mask:${Binary(br_mask)}, cfi_idx.valid:${cfi_idx.valid}, cfi_idx.bits:${cfi_idx.bits} \n")
