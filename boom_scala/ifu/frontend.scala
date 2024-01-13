@@ -388,6 +388,9 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   implicit val edge = outer.masterNode.edges.out(0)
   require(fetchWidth*coreInstBytes == outer.icacheParams.fetchBytes)
 
+  val debug_cycle = RegInit(0.U(64.W))
+  debug_cycle := debug_cycle + 1.U
+
   // val bpd = Module(new BranchPredictor)
   val nbpd = Module(new BlockPredictor)
   // bpd.io.f3_fire := false.B
@@ -515,7 +518,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     XSDebug(cond, "-----------------F1 NPC Info-----------------\n")
     XSDebug(cond, p"PC: 0x${Hexadecimal(s1_vpc)}\n")
     XSDebug(cond, p"do_redirect: ${n_f1_do_redirect} cfiIndex: ${n_f1_redirect_idx} NPC: 0x${Hexadecimal(n_f1_predicted_target)}\n")
-    n_s1_bpd_resp.pred.display(cond && n_f1_do_redirect)
+    n_s1_bpd_resp.pred.display(cond /*&& n_f1_do_redirect*/)
     XSDebug(cond, "---------------------------------------------\n")
   }
 
@@ -887,6 +890,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
       // bank_mask(w) := f3.io.deq.valid && f3_imemresp.mask(i) && valid && !redirect_found
       // f3_mask  (i) := f3.io.deq.valid && f3_imemresp.mask(i) && valid && !redirect_found
       val bpd_predicted_target = n_f3_bpd_resp.io.deq.bits.pred.getTarget(i.asUInt, n_f3_bpd_resp.io.deq.bits.pc) // FTB
+      assert(bpd_predicted_target =/= 0.U, "bpd_predicted_target is 0\n")
       f3_targs (i) := Mux(brsigs.cfi_type === CFI_JALR,
         Mux(f3_recorded_cfi_mask(i), bpd_predicted_target, nextFetch(f3_imemresp.pc)), // TODO: fixme for unrecorded JALR
         brsigs.target)
@@ -1091,7 +1095,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
 
       f3_fetch_bundle.fsrc := BSRC_3
       if(enableF3RedirectInfoPrint || enableWatchPC){
-        val printCond = f3_redirects.reduce(_||_)
+        val printCond = true.B
         val watchCond = f3_fetch_bundle.pc === watchPC.asUInt
         val cond = if(enableWatchPC) watchCond else printCond
         XSDebug(cond, "-----------------F3 NPC Info-----------------\n")
@@ -1128,6 +1132,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   f4_btb_corrections.io.enq.bits.meta                 := f3_fetch_bundle.bpd_meta
   f4_btb_corrections.io.enq.bits.pd                   := f3_fetch_bundle.pd
   f4_btb_corrections.io.enq.bits.ftb_entry            := f3_fetch_bundle.ftb_entry
+  f4_btb_corrections.io.enq.bits.cfi_taken            := false.B
 
   when(f4_btb_corrections.io.enq.valid){
     assert(f4_btb_corrections.io.enq.bits.cfi_idx.valid, "when f4_btb_corrections.io.enq.valid, cfi_idx should be valid")
@@ -1279,7 +1284,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
 
   ftbEntryGen.new_entry := DontCare
   ftbEntryGen.new_br_insert_pos := DontCare
-  ftbEntryGen.taken_mask := DontCare
+  // ftbEntryGen.taken_mask := DontCare
   ftbEntryGen.jmp_taken := DontCare
   ftbEntryGen.mispred_mask := DontCare
 
@@ -1322,6 +1327,13 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   // nbpd.io.update.bits.meta := bpd_update_arbiter.io.out.bits.meta(0)
   // nbpd.io.update.bits.pd := bpd_update_arbiter.io.out.bits.pd
 
+  if(enablePCTracePrint){
+    val cond = true.B
+    XSDebug(cond, p"--------------------PC Trace Cycle: ${debug_cycle}--------------------\n")
+    XSDebug(cond, p"s0_pc: 0x${Hexadecimal(s0_vpc)}, s1_pc: 0x${Hexadecimal(s1_vpc)}, s2_pc: 0x${Hexadecimal(s2_vpc)}, s3_pc: 0x${Hexadecimal(f3_imemresp.pc)}, ftq_pc: 0x${Hexadecimal(ftq.io.enq.bits.pc)}\n")
+    XSDebug(cond, p"s0_valid: ${s0_valid}, s1_valid: ${s1_valid}, s2_valid: ${s2_valid}, s3_valid: ${f3.io.deq.valid}, ftq_valid: ${ftq.io.enq.valid}\n")
+    XSDebug(cond, p"----------------------------------------------------------------------\n")
+  }
 
   // -------------------------------------------------------
   // **** To Core (F5) ****

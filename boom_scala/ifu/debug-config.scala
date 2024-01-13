@@ -20,12 +20,15 @@ trait hasFTBDebugConfigs {
   val enableFauFTBInsertionPrint = false // print the insertion infos in FauFTB
   val enableFauFTBUpdateDetailPrint = false // print the update details in FauFTB
   val enableF0PCPrint = false // print info about F0 NPC
-  val enableF1RedirectInfoPrint = false // print info about F1 NPC
-  val enableF2RedirectInfoPrint = false // print info about F2 NPC
-  val enableF2ZeroVPCPrint = true
+  val enableF1RedirectInfoPrint = true // print info about F1 NPC
+  val enableF2RedirectInfoPrint = true // print info about F2 NPC
+  val enableF2ZeroVPCPrint = false
   val enableF3RedirectInfoPrint = true // print info about F3 redirect
-  val enableF3ZeroVPCPrint = true
-  val enableF5RedirectInfoPrint = false// print info about F5 redirect
+  val enableF3ZeroVPCPrint = false
+  val enableF5RedirectInfoPrint = true// print info about F5 redirect
+  val enablePCTracePrint = true//
 
   val enableF1vsF2BPRespDiff = false
+
+  val enableCommitTracePrint = true
 }

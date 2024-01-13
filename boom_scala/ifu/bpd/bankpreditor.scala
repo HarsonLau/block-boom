@@ -224,6 +224,7 @@ with HasBoomFTBParameters
 
     blockMask := Mux(entry.carry || !entry.valid, VecInit((0 until predictWidth).map(i => true.B)), VecInit((0 until predictWidth).map(i => i.U < entry.pftAddr)))
     assert(blockMask.asUInt =/= 0.U, "blockMask should not be zero")
+    assert(fallThroughAddr =/= 0.U, "fallThroughAddr should not be zero")
   }
 
   def makeDefault(
@@ -237,6 +238,7 @@ with HasBoomFTBParameters
     // jalr_target := 0.U
     offsets := VecInit(Seq.fill(totalSlot)(0.U))
     fallThroughAddr := nextFetch(pc)
+    assert(fallThroughAddr =/= 0.U, "fallThroughAddr should not be zero")
 
     is_jal := false.B
     is_jalr := false.B
