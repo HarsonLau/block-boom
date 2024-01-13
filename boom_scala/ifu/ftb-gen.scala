@@ -45,9 +45,16 @@ class FTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBPara
     io.old_entry.display(cond)
     XSDebug(cond, p"------------------------------------------\n")
   }
-
   val hit = io.old_entry.valid
   val pd = io.pd
+
+  when(io.cfiIndex.valid && pd.jmpOffset === io.cfiIndex.bits && pd.jmpInfo.valid){
+    assert(io.cfiTaken || io.isF3Correction, "when not from F3 correction, jmp should be taken")
+  }
+  when(io.cfiIndex.valid && pd.jmpInfo.valid){
+    assert(io.isF3Correction || !(io.cfiIndex.bits > pd.jmpOffset), "when not from F3 correction, cfiIndex should not be larger than jmpOffset")
+  }
+
 
   val init_entry = WireInit(0.U.asTypeOf(new FTBEntry))
 
@@ -92,7 +99,8 @@ class FTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBPara
 
   //TODO: how's the jmpPft calculated?
   val jmpPft = pd.jmpOffset +& Mux(pd.rvcMask(pd.jmpOffset), 1.U, 2.U)
-  init_entry.pftAddr := Mux(entry_has_jmp && !last_jmp_rvi, jmpPft, 0.U)// FTB： align to boundary
+  val defaultPft = getLower(nextFetch(io.start_addr))
+  init_entry.pftAddr := Mux(entry_has_jmp && !last_jmp_rvi, jmpPft, defaultPft)// FTB： align to boundary
   init_entry.carry   := Mux(entry_has_jmp && !last_jmp_rvi, jmpPft(carryPos-instOffsetBits), true.B)
   init_entry.isJalr := new_jmp_is_jalr
   init_entry.isCall := new_jmp_is_call
@@ -205,8 +213,8 @@ class FTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBPara
   io.new_entry := Mux(!hit, init_entry, derived_from_old_entry)
 
   io.new_br_insert_pos := new_br_insert_onehot
-  io.taken_mask := VecInit((io.new_entry.brOffset zip io.new_entry.brValids).map{
-    case (off, v) => io.cfiIndex.bits === off && io.cfiIndex.valid && v //&& io.cfiTaken
+  io.taken_mask := VecInit((io.new_entry.brOffset zip io.new_entry.validSlots).map{
+    case (off, v) => io.cfiIndex.bits === off && io.cfiIndex.valid && v && io.cfiTaken
   })
   io.jmp_taken := io.new_entry.jmpValid && io.new_entry.tailSlot.offset === io.cfiIndex.bits
   for (i <- 0 until numBr) {
