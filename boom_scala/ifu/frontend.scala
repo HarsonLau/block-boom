@@ -945,12 +945,14 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
       val jalTargetMispredicted = (
         f3_mask(i) &&
         brsigs.cfi_type === CFI_JAL &&
+        n_f3_bpd_resp.io.deq.bits.pred.validPredict(i.asUInt)&& // Note: In the original implemenation, this is not commented out
         n_f3_bpd_resp.io.deq.bits.pred.getTarget(i.asUInt, n_f3_bpd_resp.io.deq.bits.pc) =/= brsigs.target
       )
 
       val takenBrTargetMispredicted = (
         f3_mask(i) &&
         brsigs.cfi_type === CFI_BR && n_f3_bpd_resp.io.deq.bits.pred.is_taken(i.asUInt)&&
+        n_f3_bpd_resp.io.deq.bits.pred.validPredict(i.asUInt)&& // Note: In the original implemenation, this is not commented out
         n_f3_bpd_resp.io.deq.bits.pred.getTarget(i.asUInt, n_f3_bpd_resp.io.deq.bits.pc) =/= brsigs.target
       )
       // // Flush BTB entries for JALs if we mispredict the target
