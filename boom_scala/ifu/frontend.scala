@@ -932,8 +932,8 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
 
 
       assert(f3_block_mask.asUInt =/= 0.U) // FTB
-      bank_mask(w) := f3.io.deq.valid && f3_imemresp.mask(i) && valid && !redirect_found && f3_block_mask(i) // FTB
-      f3_mask  (i) := f3.io.deq.valid && f3_imemresp.mask(i) && valid && !redirect_found && f3_block_mask(i) // FTB
+      bank_mask(w) := f3.io.deq.valid && f3_imemresp.mask(i) && valid && !redirect_found //&& f3_block_mask(i) // FTB
+      f3_mask  (i) := f3.io.deq.valid && f3_imemresp.mask(i) && valid && !redirect_found //&& f3_block_mask(i) // FTB
       // bank_mask(w) := f3.io.deq.valid && f3_imemresp.mask(i) && valid && !redirect_found
       // f3_mask  (i) := f3.io.deq.valid && f3_imemresp.mask(i) && valid && !redirect_found
       val bpd_predicted_target = n_f3_bpd_resp.io.deq.bits.pred.getTarget(i.asUInt, n_f3_bpd_resp.io.deq.bits.pc) // FTB
@@ -1089,11 +1089,11 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
       ras.io.read_addr,
       f3_targs(PriorityEncoder(f3_redirects))
     ),
-    // nextFetch(f3_fetch_bundle.pc) // TODO: use nextFetch or fallThru addr?
-    Mux(n_f3_bpd_resp.io.deq.bits.pred.hit,
-    n_f3_bpd_resp.io.deq.bits.pred.fallThroughAddr,
-    nextFetch(f3_fetch_bundle.pc)
-    )
+    nextFetch(f3_fetch_bundle.pc) // TODO: use nextFetch or fallThru addr?
+    // Mux(n_f3_bpd_resp.io.deq.bits.pred.hit,
+    // n_f3_bpd_resp.io.deq.bits.pred.fallThroughAddr,
+    // nextFetch(f3_fetch_bundle.pc)
+    // )
   )
 
   f3_fetch_bundle.next_pc       := f3_predicted_target
