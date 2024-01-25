@@ -285,3 +285,56 @@ object FTBMeta {
   }
 }
 
+
+class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
+  require(isPow2(numSets))
+  val s1_meta = Wire(new FTBMeta)
+  val f3_meta = RegNext(RegNext(s1_meta))
+  io.resp.f3_meta := f3_meta
+
+  override val metaSz = s1_meta.asUInt.getWidth
+  override val nSets = numSets
+  override val nWays = numWays
+  val ftbEntrySz = new FTBEntry().asUInt.getWidth
+
+  val doing_reset = RegInit(true.B)
+  val reset_idx   = RegInit(0.U(log2Ceil(nSets).W))
+  reset_idx := reset_idx + doing_reset
+  when (reset_idx === (nSets-1).U) { doing_reset := false.B }
+
+
+  val ftbAddr = new TableAddr(log2Up(numSets), 1)
+
+  val tag = Seq.fill(nWays) {SyncReadMem(nSets, UInt(tagSize.W))}
+  val ftb = Seq.fill(nWays) {SyncReadMem(nSets, new FTBEntry)}
+
+  //TODO: val mems = ...
+
+  val mems = (((0 until nWays) map ({w:Int => Seq(
+    (f"ftb_tag_way$w", nSets, tagSize),
+    (f"ftb_data_way$w", nSets, ftbEntrySz))})).flatten)
+
+  override val s0_idx = ftbAddr.getIdx(s0_pc)
+  val s0_tag = ftbAddr.getTag(s0_pc)
+  val s1_req_rftb = VecInit(ftb.map(_.read(s0_idx, s0_valid)).map(_.asTypeOf(new FTBEntry)))
+  val s1_req_rtag = VecInit(tag.map(_.read(s0_idx, s0_valid)))
+  val s1_req_tag = RegNext(s0_tag)
+
+  val s1_hit_ohs = VecInit( (0 until nWays) map { i =>
+    val hit = s1_req_rtag(i) === s1_req_tag
+    hit
+  })
+  val s1_hit = s1_hit_ohs.reduce(_||_)
+  val s1_hit_way = PriorityEncoder(s1_hit_ohs)
+  val s1_ftb_entry = Mux(s1_hit, s1_req_rftb(s1_hit_way), 0.U.asTypeOf(new FTBEntry))
+  val s1_pred = Wire(new BlockPrediction)
+  s1_pred.fromFtbEntry(s1_ftb_entry, s1_pc)
+
+  s1_meta.hit := s1_hit
+  s1_meta.writeWay := s1_hit_way
+
+  
+
+
+
+}

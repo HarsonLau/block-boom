@@ -31,6 +31,22 @@ object selectByTaken {
   }
 }
 
+class TableAddr(val idxBits: Int, val banks: Int)(implicit p: Parameters) extends BoomBundle
+{
+  val instOffsetBits = 1
+  def tagBits = vaddrBitsExtended - idxBits - instOffsetBits
+
+  val tag = UInt(tagBits.W)
+  val idx = UInt(idxBits.W)
+  val offset = UInt(instOffsetBits.W)
+
+  def fromUInt(x: UInt) = x.asTypeOf(UInt(vaddrBitsExtended.W)).asTypeOf(this)
+  def getTag(x: UInt) = fromUInt(x).tag
+  def getIdx(x: UInt) = fromUInt(x).idx
+  def getBank(x: UInt) = if (banks > 1) getIdx(x)(log2Up(banks) - 1, 0) else 0.U
+  def getBankIdx(x: UInt) = if (banks > 1) getIdx(x)(idxBits - 1, log2Up(banks)) else getIdx(x)
+}
+
 class BlockPrediction(implicit p: Parameters) extends BoomBundle()(p)
 with HasBoomFTBParameters
 {

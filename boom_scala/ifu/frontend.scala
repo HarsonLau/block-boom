@@ -681,8 +681,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
       s2_ghist := n_f2_predicted_ghist
     }
     when ((s1_valid && (s1_vpc =/= n_f2_predicted_target || n_f2_correct_f1_ghist)) || !s1_valid) {
-      // assert(false.B, "s1_vpc != n_f2_predicted_target")
-      assert(!s1_valid || s1_vpc === n_f2_predicted_target, "s1_vpc != n_f2_predicted_target")// TODO: remove this after adding F2 predictors
+      // assert(!s1_valid || s1_vpc === n_f2_predicted_target, "s1_vpc != n_f2_predicted_target")// TODO: remove this after adding F2 predictors
       f1_clear := true.B
 
       s0_valid     := !((s2_tlb_resp.ae.inst || s2_tlb_resp.pf.inst) && !s2_is_replay)
