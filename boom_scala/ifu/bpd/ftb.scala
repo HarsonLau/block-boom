@@ -290,7 +290,6 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   require(isPow2(numSets))
   val s1_meta = Wire(new FTBMeta)
   val f3_meta = RegNext(RegNext(s1_meta))
-  io.resp.f3_meta := f3_meta
 
   override val metaSz = s1_meta.asUInt.getWidth
   override val nSets = numSets
@@ -330,11 +329,79 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   val s1_pred = Wire(new BlockPrediction)
   s1_pred.fromFtbEntry(s1_ftb_entry, s1_pc)
 
+  val alloc_way = if (nWays > 1) {
+    // val r_metas = Cat(VecInit(s1_req_rtag.map { w => VecInit(w.map(_.tag)) }).asUInt, s1_req_tag(tagSz-1,0))
+    val r_metas = Cat(s1_req_rtag.asUInt, s1_req_tag)
+
+    val l = log2Ceil(nWays)
+    val nChunks = (r_metas.getWidth + l - 1) / l
+    val chunks = (0 until nChunks) map { i =>
+      r_metas(min((i+1)*l, r_metas.getWidth)-1, i*l)
+    }
+    chunks.reduce(_^_)
+  } else {
+    0.U
+  }
+
   s1_meta.hit := s1_hit
-  s1_meta.writeWay := s1_hit_way
+  s1_meta.writeWay := Mux(s1_hit, s1_hit_way, alloc_way)
 
-  
+  io.resp.f2 := io.resp_in(0).f2
+  io.resp.f3 := io.resp_in(0).f3
+  when(s1_hit) {
+    io.resp.f2.fromFtbEntry(RegNext(s1_ftb_entry), RegNext(s1_pc))
+    io.resp.f3.fromFtbEntry(RegNext(RegNext(s1_ftb_entry)), RegNext(RegNext(s1_pc)))
+  }
+  io.resp.f3_meta := f3_meta
+  io.resp.last_stage_entry := Mux(RegNext(RegNext(s1_hit)), RegNext(RegNext(s1_ftb_entry)), io.resp_in(0).last_stage_entry)
 
 
+  /********************** update ***********************/
+
+  // s0
+  val u = io.update
+  if(enableFTBUpdateDetailPrint || enableWatchPC){
+    val printCond = u.valid
+    val watchCond = u.valid && u.bits.pc === watchPC.U
+    val cond = if(enableFTBUpdateDetailPrint) printCond else watchCond
+    XSDebug(cond, p"-------FTB update entry for PC : ${u.bits.pc}-------\n")
+    u.bits.display(cond)
+    XSDebug(cond, p"-----------------------------------\n")
+  }
+  val u_meta = u.bits.meta.asTypeOf(new FTBMeta)
+  val ftbUpdateAddr = new TableAddr(log2Up(numSets), 1)
+  val u_s0_tag = ftbUpdateAddr.getTag(u.bits.pc)
+  val u_s0_idx = ftbUpdateAddr.getIdx(u.bits.pc)
+  val u_s0_entry_valid_slot_mask = u.bits.ftb_entry.brValids
+  val u_s0_br_update_valids =
+    VecInit((0 until numBr).map(w =>
+      u.valid &&
+      !u.bits.is_btb_mispredict_update &&
+      u.bits.ftb_entry.valid &&
+      u_s0_entry_valid_slot_mask(w) &&  
+      u.bits.ftb_entry.brValids(w) &&
+      !(PriorityEncoder(u.bits.br_taken_mask) < w.U))) // TODO: temporarily disable always taken
+    
+  // s1
+  val u_s1_pc = RegNext(u.bits.pc)
+  val u_s1_meta = RegNext(u_meta)
+  val u_s1_valid = RegNext(u.valid)
+  val u_s1_commit_valid = RegNext(u.valid && !u.bits.is_btb_mispredict_update)
+  val u_s1_tag       = RegEnable(u_s0_tag, u.valid)
+  val u_s1_ftb_entry = RegEnable(u.bits.ftb_entry, u.valid)
+  val u_s1_ftb_entry_empty = !u_s1_ftb_entry.valid || !u_s1_ftb_entry.hasValidSlot // if the entry is invalid or contains no valid slot
+
+  for ( w <- 0 until nWays){
+    when (doing_reset || u_s1_meta.writeWay === w.U || (w == 0 && nWays == 1).B) {
+      ftb(w).write(
+        Mux(doing_reset, reset_idx, s1_update_idx),
+        Mux(doing_reset, 0.U.asTypeOf(new FTBEntry), u_s1_ftb_entry)
+      )
+      tag(w).write(
+        Mux(doing_reset, reset_idx, s1_update_idx),
+        Mux(doing_reset, 0.U.asTypeOf(UInt(tagSize.W)), u_s1_tag)
+      )
+    }
+  }
 
 }

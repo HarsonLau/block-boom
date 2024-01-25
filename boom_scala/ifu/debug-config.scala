@@ -28,6 +28,7 @@ trait hasFTBDebugConfigs {
   val enableF5RedirectInfoPrint = true// print info about F5 redirect
   val enablePCTracePrint = true//
 
+  val enableFTBUpdateDetailPrint = false
   val enableF1vsF2BPRespDiff = false
 
   val enableCommitTracePrint = true
