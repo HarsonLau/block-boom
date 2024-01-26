@@ -294,7 +294,7 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   override val metaSz = s1_meta.asUInt.getWidth
   override val nSets = numSets
   override val nWays = numWays
-  val ftbEntrySz = new FTBEntry().asUInt.getWidth
+  val ftbEntrySz = io.resp.last_stage_entry.asUInt.getWidth
 
   val doing_reset = RegInit(true.B)
   val reset_idx   = RegInit(0.U(log2Ceil(nSets).W))
@@ -313,10 +313,10 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
     (f"ftb_tag_way$w", nSets, tagSize),
     (f"ftb_data_way$w", nSets, ftbEntrySz))})).flatten)
 
-  override val s0_idx = ftbAddr.getIdx(s0_pc)
+  val r_s0_idx = ftbAddr.getIdx(s0_pc)
   val s0_tag = ftbAddr.getTag(s0_pc)
-  val s1_req_rftb = VecInit(ftb.map(_.read(s0_idx, s0_valid)).map(_.asTypeOf(new FTBEntry)))
-  val s1_req_rtag = VecInit(tag.map(_.read(s0_idx, s0_valid)))
+  val s1_req_rftb = VecInit(ftb.map(_.read(r_s0_idx, s0_valid)).map(_.asTypeOf(new FTBEntry)))
+  val s1_req_rtag = VecInit(tag.map(_.read(r_s0_idx, s0_valid)))
   val s1_req_tag = RegNext(s0_tag)
 
   val s1_hit_ohs = VecInit( (0 until nWays) map { i =>
@@ -326,12 +326,10 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   val s1_hit = s1_hit_ohs.reduce(_||_)
   val s1_hit_way = PriorityEncoder(s1_hit_ohs)
   val s1_ftb_entry = Mux(s1_hit, s1_req_rftb(s1_hit_way), 0.U.asTypeOf(new FTBEntry))
-  val s1_pred = Wire(new BlockPrediction)
-  s1_pred.fromFtbEntry(s1_ftb_entry, s1_pc)
 
   val alloc_way = if (nWays > 1) {
     // val r_metas = Cat(VecInit(s1_req_rtag.map { w => VecInit(w.map(_.tag)) }).asUInt, s1_req_tag(tagSz-1,0))
-    val r_metas = Cat(s1_req_rtag.asUInt, s1_req_tag)
+    val r_metas = Cat(s1_req_rtag.asUInt, s1_req_tag(tagSize - 1, 0))
 
     val l = log2Ceil(nWays)
     val nChunks = (r_metas.getWidth + l - 1) / l
@@ -352,7 +350,7 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
     io.resp.f2.fromFtbEntry(RegNext(s1_ftb_entry), RegNext(s1_pc))
     io.resp.f3.fromFtbEntry(RegNext(RegNext(s1_ftb_entry)), RegNext(RegNext(s1_pc)))
   }
-  io.resp.f3_meta := f3_meta
+  io.resp.f3_meta := f3_meta.asUInt
   io.resp.last_stage_entry := Mux(RegNext(RegNext(s1_hit)), RegNext(RegNext(s1_ftb_entry)), io.resp_in(0).last_stage_entry)
 
 
