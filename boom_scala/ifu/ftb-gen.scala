@@ -85,7 +85,9 @@ class FTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBPara
     init_br_slot.valid := true.B
     init_br_slot.offset := io.cfiIndex.bits
     init_br_slot.setLowerStatByTarget(io.start_addr, io.target, numBr == 1)
-    assert(init_br_slot.getTarget(io.start_addr) === io.target, "br target not match")
+    // When the difference between the start_addr and the target is too large, the assert will fail
+    WarnAssert(init_br_slot.getTarget(io.start_addr) === io.target, 
+    p"br target not match  start addr 0x${Hexadecimal(io.start_addr)} target 0x${Hexadecimal(io.target)} recorded target 0x${Hexadecimal(init_br_slot.getTarget(io.start_addr))}\n")
     init_entry.always_taken(0) := true.B // set to always taken on init
   }
 
@@ -99,9 +101,10 @@ class FTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBPara
 
   //TODO: how's the jmpPft calculated?
   val jmpPft = pd.jmpOffset +& Mux(pd.rvcMask(pd.jmpOffset), 1.U, 2.U)
-  val defaultPft = getLower(nextFetch(io.start_addr))
+  val defaultPft = Mux(isLastBankInBlock(io.start_addr), 4.U, 0.U) // when nBanks === 1 , isLastBankInBlock is always false
+  val defaultCarry = Mux(isLastBankInBlock(io.start_addr), false.B, true.B)
   init_entry.pftAddr := Mux(entry_has_jmp && !last_jmp_rvi, jmpPft, defaultPft)// FTB： align to boundary
-  init_entry.carry   := Mux(entry_has_jmp && !last_jmp_rvi, jmpPft(carryPos-instOffsetBits), true.B)
+  init_entry.carry   := Mux(entry_has_jmp && !last_jmp_rvi, jmpPft(carryPos-instOffsetBits), defaultCarry)
   init_entry.isJalr := new_jmp_is_jalr
   init_entry.isCall := new_jmp_is_call
   init_entry.isRet  := new_jmp_is_ret

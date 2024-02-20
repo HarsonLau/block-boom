@@ -64,8 +64,15 @@ trait BPUUtils extends HasBoomFTBParameters {
   }
 
   def getFallThroughAddr(start: UInt, carry: Bool, pft: UInt) = {
-    val higher = start.head(vaddrBitsExtended-log2Ceil(predictWidth)-instOffsetBits)
-    Cat(Mux(carry, higher+1.U, higher), pft, 0.U(instOffsetBits.W))
+    if(nBanks == 1){
+      val higher = start.head(vaddrBitsExtended-log2Ceil(predictWidth)-instOffsetBits)
+      Cat(Mux(carry, higher+1.U, higher), pft, 0.U(instOffsetBits.W))
+    }
+    else{
+      require(nBanks == 2)
+      val base = bankAlign(start)
+      Mux(carry, base + fetchBytes.asUInt, base + pft * 2.U) 
+    }
   }
 
   // def foldTag(tag: UInt, l: Int): UInt = {
