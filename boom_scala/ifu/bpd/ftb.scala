@@ -289,7 +289,6 @@ object FTBMeta {
 class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   require(isPow2(numSets))
   val s1_meta = Wire(new FTBMeta)
-  val f3_meta = RegNext(RegNext(s1_meta))
 
   override val metaSz = s1_meta.asUInt.getWidth
   override val nSets = numSets
@@ -326,6 +325,7 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   val s1_hit = s1_hit_ohs.reduce(_||_)
   val s1_hit_way = PriorityEncoder(s1_hit_ohs)
   val s1_ftb_entry = Mux(s1_hit, s1_req_rftb(s1_hit_way), 0.U.asTypeOf(new FTBEntry))
+  val s1_hit_fallthrough_error = false.B
 
   val alloc_way = if (nWays > 1) {
     // val r_metas = Cat(VecInit(s1_req_rtag.map { w => VecInit(w.map(_.tag)) }).asUInt, s1_req_tag(tagSz-1,0))
@@ -341,17 +341,21 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
     0.U
   }
 
-  s1_meta.hit := s1_hit
+  s1_meta.hit := s1_hit && !s1_hit_fallthrough_error
   s1_meta.writeWay := Mux(s1_hit, s1_hit_way, alloc_way)
 
   io.resp.f2 := io.resp_in(0).f2
   io.resp.f3 := io.resp_in(0).f3
-  when(s1_hit) {
+  when(RegNext(s1_hit && !s1_hit_fallthrough_error)) {
     io.resp.f2.fromFtbEntry(RegNext(s1_ftb_entry), RegNext(s1_pc))
-    io.resp.f3.fromFtbEntry(RegNext(RegNext(s1_ftb_entry)), RegNext(RegNext(s1_pc)))
+    io.resp.f2.hit := true.B
   }
-  io.resp.f3_meta := f3_meta.asUInt
-  io.resp.last_stage_entry := Mux(RegNext(RegNext(s1_hit)), RegNext(RegNext(s1_ftb_entry)), io.resp_in(0).last_stage_entry)
+  when(RegNext(RegNext(s1_hit && !s1_hit_fallthrough_error))) {
+    io.resp.f3.fromFtbEntry(RegNext(RegNext(s1_ftb_entry)), RegNext(RegNext(s1_pc)))
+    io.resp.f3.hit := true.B
+  }
+  io.resp.f3_meta := RegNext(RegNext(s1_meta)).asUInt
+  io.resp.last_stage_entry := Mux(RegNext(RegNext(s1_hit && !s1_hit_fallthrough_error)), RegNext(RegNext(s1_ftb_entry)), io.resp_in(0).last_stage_entry)
 
 
   /********************** update ***********************/
@@ -386,17 +390,18 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   val u_s1_valid = RegNext(u.valid)
   val u_s1_commit_valid = RegNext(u.valid && !u.bits.is_btb_mispredict_update)
   val u_s1_tag       = RegEnable(u_s0_tag, u.valid)
+  val u_s1_idx = RegEnable(u_s0_idx, u.valid)
   val u_s1_ftb_entry = RegEnable(u.bits.ftb_entry, u.valid)
   val u_s1_ftb_entry_empty = !u_s1_ftb_entry.valid || !u_s1_ftb_entry.hasValidSlot // if the entry is invalid or contains no valid slot
 
   for ( w <- 0 until nWays){
-    when (doing_reset || u_s1_meta.writeWay === w.U || (w == 0 && nWays == 1).B) {
+    when (doing_reset || ((u_s1_meta.writeWay === w.U || (w == 0 && nWays == 1).B) && !u_s1_ftb_entry_empty && u_s1_valid)) {
       ftb(w).write(
-        Mux(doing_reset, reset_idx, s1_update_idx),
+        Mux(doing_reset, reset_idx, u_s1_idx),
         Mux(doing_reset, 0.U.asTypeOf(new FTBEntry), u_s1_ftb_entry)
       )
       tag(w).write(
-        Mux(doing_reset, reset_idx, s1_update_idx),
+        Mux(doing_reset, reset_idx, u_s1_idx),
         Mux(doing_reset, 0.U.asTypeOf(UInt(tagSize.W)), u_s1_tag)
       )
     }
