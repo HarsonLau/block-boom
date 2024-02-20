@@ -153,6 +153,11 @@ class FauFTB(implicit p: Parameters) extends BlockPredictorBank with FauFTBParam
       u_s0_entry_valid_slot_mask(w) &&  
       u.bits.ftb_entry.brValids(w) &&
       !(PriorityEncoder(u.bits.br_taken_mask) < w.U))) // TODO: temporarily disable always taken
+  // check fall through error
+  val cond = u.valid && u.bits.ftb_entry.valid && u.bits.ftb_entry.getFallThrough(u.bits.pc) <= u.bits.pc
+  XSDebug(cond, p"FauFTB fall through error for PC : 0x${Hexadecimal(u.bits.pc)}\n")
+  u.bits.display(cond)
+  XSDebug(cond, p"-----------------------------------\n")
 
   // s1
   val u_s1_pc = RegNext(u.bits.pc)
@@ -174,9 +179,6 @@ class FauFTB(implicit p: Parameters) extends BlockPredictorBank with FauFTBParam
     XSDebug(cond, p"-----------------------------------\n")
   }
 
-  val u_s1_fallthru = u_s1_ftb_entry.getFallThrough(u_s1_pc)
-  val cond = !u.valid || !u_s1_ftb_entry.valid || u_s1_fallthru > u_s1_pc
-  WarnAssert(cond, p"FauFTB Fallthru Error fallthru: ${Hexadecimal(u_s1_fallthru)} pc: ${Hexadecimal(u_s1_pc)}\n entry.carry: ${u_s1_ftb_entry.carry} entry.pftAddr: ${Hexadecimal(u_s1_ftb_entry.pftAddr)}\n")
 
   val u_s1_ways_write_valid = VecInit((0 until numWays).map(w => u_s1_write_way_oh(w).asBool && u_s1_valid && !u_s1_ftb_entry_empty))
   for (w <- 0 until numWays) {
