@@ -61,14 +61,24 @@ class BlockBIM(params: BlockBIMParams = BlockBIMParams())(implicit p: Parameters
     s2_meta.bims(w)   := s2_req_rdata(w)
   }
 
+  for (w <- 0 until numBr) {
+    io.resp.f2.br_taken_mask(w) := s2_resp(w)
+    io.resp.f3.br_taken_mask(w) := RegNext(io.resp.f2.br_taken_mask(w))
+  }
+  io.resp.f3_meta := RegNext(s2_meta.asUInt)
+
   /********************** update ***********************/
 
   val s1_update_wdata   = Wire(Vec(numBr, UInt(2.W)))
   val s1_update_wmask   = Wire(Vec(numBr, Bool()))
   val s1_update_meta    = s1_update.bits.meta.asTypeOf(new BlockBIMMeta)
   val s1_update_index   = s1_update_idx 
-  val s1_br_update_valids  = VecInit((0 until numBr).map(w => s1_update.bits.ftb_entry.valid &&
-    s1_update.bits.ftb_entry.brValids(w) && s1_update.valid && !s1_update.bits.ftb_entry.always_taken(w) &&
+  val s1_br_update_valids  = VecInit((0 until numBr).map(w => 
+    !s1_update.bits.is_btb_mispredict_update &&
+    s1_update.bits.ftb_entry.valid &&
+    s1_update.bits.ftb_entry.brValids(w) &&
+    s1_update.valid &&
+    !s1_update.bits.ftb_entry.always_taken(w) &&
     !(PriorityEncoder(s1_update.bits.br_taken_mask) < w.U)))
 
   val wrbypass_idxs = Reg(Vec(nWrBypassEntries, UInt(log2Ceil(nSets).W)))
@@ -137,9 +147,4 @@ class BlockBIM(params: BlockBIMParams = BlockBIMParams())(implicit p: Parameters
     }
   }
 
-  for (w <- 0 until numBr) {
-    io.resp.f2.br_taken_mask(w) := s2_resp(w)
-    io.resp.f3.br_taken_mask(w) := RegNext(io.resp.f2.br_taken_mask(w))
-  }
-  io.resp.f3_meta := RegNext(s2_meta.asUInt)
 }

@@ -479,16 +479,16 @@ class WithBlockBPD extends Config((site, here, up) => {
         val fauftb = Module(new FauFTB()(p))
         val ftb = Module(new FTB()(p))
         val bim = Module(new BlockBIM()(p))
-        val tage = Module(new BlockTage()(p))
-        val preds = Seq(fauftb, ftb, bim, tage)
+        // val tage = Module(new BlockTage()(p))
+        val preds = Seq(fauftb, ftb, bim)
         preds.map(_.io := DontCare)
 
         fauftb.io.resp_in(0)  := resp_in
-        ftb.io.resp_in(0)   := fauftb.io.resp
-        bim.io.resp_in(0)  := ftb.io.resp
-        tage.io.resp_in(0) := bim.io.resp
+        bim.io.resp_in(0)  := fauftb.io.resp
+        ftb.io.resp_in(0)   := bim.io.resp
+        // tage.io.resp_in(0)  := ftb.io.resp
         
-        (preds, tage.io.resp)
+        (preds, ftb.io.resp)
       })
     )))
     case other => other

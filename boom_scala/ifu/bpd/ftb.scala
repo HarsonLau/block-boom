@@ -349,10 +349,20 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   when(RegNext(s1_hit && !s1_hit_fallthrough_error)) {
     io.resp.f2.fromFtbEntry(RegNext(s1_ftb_entry), RegNext(s1_pc))
     io.resp.f2.hit := true.B
+    for (i <- 0 until numBr) {
+      when(RegNext(s1_ftb_entry.always_taken(i))) {
+        io.resp.f2.br_taken_mask(i) := true.B
+      }
+    }
   }
   when(RegNext(RegNext(s1_hit && !s1_hit_fallthrough_error))) {
     io.resp.f3.fromFtbEntry(RegNext(RegNext(s1_ftb_entry)), RegNext(RegNext(s1_pc)))
     io.resp.f3.hit := true.B
+    for(i <- 0 until numBr) {
+      when(RegNext(RegNext(s1_ftb_entry.always_taken(i))) && RegNext(RegNext(s1_ftb_entry.validSlots(i)))) {
+        io.resp.f3.br_taken_mask(i) := true.B
+      }
+    }
   }
   io.resp.f3_meta := RegNext(RegNext(s1_meta)).asUInt
   io.resp.last_stage_entry := Mux(RegNext(RegNext(s1_hit && !s1_hit_fallthrough_error)), RegNext(RegNext(s1_ftb_entry)), io.resp_in(0).last_stage_entry)

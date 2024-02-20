@@ -13,7 +13,7 @@ trait hasFTBDebugConfigs {
   val enableF4FTBGenIOPrint = false // print the input and output of FTBEntryGen in F4
   val enableFTBGenInternalPrint = false // print the internal signals of FTBEntryGen
   val enableF4BTBCorrectionInputPrint = false // print the input of BTBCorrection in F4
-  val enableWatchPC = true
+  val enableWatchPC = false
   val watchPC = 0x80002038L
   val enableF3MaskPrint = false
   val enbaleBankPredictorUpdatePrint = false
@@ -28,9 +28,9 @@ trait hasFTBDebugConfigs {
   val enableF5RedirectInfoPrint = true// print info about F5 redirect
   val enablePCTracePrint = true//
 
-  val enableFTBUpdateDetailPrint = true
-  val enableFTBPredictPrint = true
-  val enableF1vsF2BPRespDiff = false
+  val enableFTBUpdateDetailPrint = false
+  val enableFTBPredictPrint = false
+  val enableF1vsF2BPRespDiff = true
 
-  val enableCommitTracePrint = true
+  val enableCommitTracePrint = false
 }

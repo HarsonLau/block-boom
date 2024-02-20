@@ -503,7 +503,7 @@ abstract class BlockPredictorBank(implicit p: Parameters) extends BoomModule()(p
   val s1_pc = RegNext(s0_pc)
 
   val s0_update     = io.update
-  val s0_update_idx = fetchIdx(io.update.bits.pc)
+  val s0_update_idx = blockFetchIdx(io.update.bits.pc)
   val s0_update_valid = io.update.valid
 
   val s1_update     = RegNext(s0_update)
