@@ -1323,7 +1323,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   if(enableF4FTBGenIOPrint || enableWatchPC){
     val cond = if(enableF4FTBGenIOPrint) bpd_update_arbiter.io.out.bits.cfi_idx.valid else bpd_update_arbiter.io.out.bits.pc === watchPC.asUInt
     XSDebug(cond, "--------------------bpd_update_arbiter.io.out--------------------\n")
-    bpd_update_arbiter.io.out.bits.ftb_entry.display(cond)
+    bpd_update_arbiter.io.out.bits.ftb_entry.display(cond, false)
     bpd_update_arbiter.io.out.bits.display(cond)
     XSDebug(cond, "-----------------------------------------------------------------\n")
   }
@@ -1423,7 +1423,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
 
     s0_valid     := false.B
     s0_vpc       := io.cpu.sfence.bits.addr
-    assert(io.cpu.sfence.bits.addr =/= 0.U, "sfence addr should not be zero\n")
+    WarnAssert(io.cpu.sfence.bits.addr =/= 0.U, p"sfence addr should not be zero\n")
     s0_is_replay := false.B
     s0_is_sfence := true.B
 
@@ -1443,7 +1443,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
 
     s0_valid     := io.cpu.redirect_val
     s0_vpc       := io.cpu.redirect_pc
-    assert(io.cpu.redirect_pc =/= 0.U, "redirect_pc should not be zero\n")
+    WarnAssert(io.cpu.redirect_pc =/= 0.U, p"redirect_pc should not be zero\n")
     s0_ghist     := io.cpu.redirect_ghist
     s0_tsrc      := BSRC_C
     s0_is_replay := false.B
