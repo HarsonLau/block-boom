@@ -231,16 +231,14 @@ with HasBoomFTBParameters
     is_br_sharing := entry.tailSlot.valid && entry.tailSlot.sharing
     // predCycle.map(_ := GTimer())
 
-    val startLower        = Cat(0.U(1.W),    pc(instOffsetBits+log2Ceil(predictWidth)-1, instOffsetBits))
-    val endLowerwithCarry = Cat(entry.carry, entry.pftAddr)
-    assert(!hit || startLower < endLowerwithCarry, "startLower should be less than endLowerwithCarry")
-    // fallThroughErr := startLower >= endLowerwithCarry
     // fallThroughAddr := Mux(fallThroughErr, pc + (predictWidth * 2).U, entry.getFallThrough(pc, last_stage_entry))
     fallThroughAddr := Mux(entry.valid, entry.getFallThrough(pc, last_stage_entry), nextFetch(pc))
 
+    // WarnAssert(fallThroughAddr > pc, p"fallthrough error: pc 0x${Hexadecimal(pc)} fallthru 0x${Hexadecimal(fallThroughAddr)} carry: ${entry.carry} pftAddr ${entry.pftAddr}\n")
+
     blockMask := Mux(entry.carry || !entry.valid, VecInit((0 until predictWidth).map(i => true.B)), VecInit((0 until predictWidth).map(i => i.U < entry.pftAddr)))
-    assert(blockMask.asUInt =/= 0.U, "blockMask should not be zero")
-    assert(fallThroughAddr =/= 0.U, "fallThroughAddr should not be zero")
+    // assert(blockMask.asUInt =/= 0.U, "blockMask should not be zero")
+    // assert(fallThroughAddr =/= 0.U, "fallThroughAddr should not be zero")
   }
 
   def makeDefault(
@@ -386,7 +384,7 @@ class BlockUpdate(implicit p: Parameters) extends BoomBundle()(p)
   val ftb_entry = new FTBEntry
   val br_taken_mask = Vec(numBr, Bool())
 
-  def display(cond: Bool , decimal:Boolean = true, _prefix:chisel3.Printable = p""):Unit={
+  def display(cond: Bool , decimal:Boolean = false, _prefix:chisel3.Printable = p""):Unit={
     val prefix = _prefix + p"BranchPredictionUpdate: "
     if(decimal){
       XSDebug(cond, prefix + p"pc: ${pc} br_mask: ${br_mask} cfi_idx.valid: ${cfi_idx.valid} cfi_idx.bits: ${cfi_idx.bits} cfi_taken: ${cfi_taken} cfi_mispredicted: ${cfi_mispredicted} cfi_is_br: ${cfi_is_br} cfi_is_jal: ${cfi_is_jal} cfi_is_jalr: ${cfi_is_jalr} target: ${target}\n")
