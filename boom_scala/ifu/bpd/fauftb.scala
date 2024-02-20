@@ -174,6 +174,10 @@ class FauFTB(implicit p: Parameters) extends BlockPredictorBank with FauFTBParam
     XSDebug(cond, p"-----------------------------------\n")
   }
 
+  val u_s1_fallthru = u_s1_ftb_entry.getFallThrough(u_s1_pc)
+  val cond = !u.valid || !u_s1_ftb_entry.valid || u_s1_fallthru > u_s1_pc
+  WarnAssert(cond, p"FauFTB Fallthru Error fallthru: ${Hexadecimal(u_s1_fallthru)} pc: ${Hexadecimal(u_s1_pc)}\n entry.carry: ${u_s1_ftb_entry.carry} entry.pftAddr: ${Hexadecimal(u_s1_ftb_entry.pftAddr)}\n")
+
   val u_s1_ways_write_valid = VecInit((0 until numWays).map(w => u_s1_write_way_oh(w).asBool && u_s1_valid && !u_s1_ftb_entry_empty))
   for (w <- 0 until numWays) {
     ways(w).io.write_valid := u_s1_ways_write_valid(w)
