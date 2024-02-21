@@ -720,7 +720,8 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     val f1_br_taken_mask = previous_bpd_resp.pred.br_taken_mask
     val f2_br_taken_mask = n_f2_bpd_resp.pred.br_taken_mask
     val diff = VecInit((0 until numBr).map(i => f1_br_taken_mask(i) =/= f2_br_taken_mask(i))).asUInt.orR
-    val cond = s2_valid && f3_ready && diff
+    val diff2 = n_f2_predicted_target =/= s1_vpc
+    val cond = s2_valid && f3_ready && diff && diff2
     XSDebug(cond, "-----------------F1 vs F2 BP Resp Diff-----------------\n")
     XSDebug(cond, p"F2 PC: 0x${Hexadecimal(s2_vpc)} F2 NPC: 0x${Hexadecimal(n_f2_predicted_target)}, S1 PC: 0x${Hexadecimal(s1_vpc)} } \n")
     XSDebug(cond, p"F1 BPD Resp: \n")

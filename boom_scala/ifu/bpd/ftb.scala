@@ -229,7 +229,7 @@ class FTBEntry(implicit p: Parameters) extends BoomBundle with FTBParams with BP
     validSlots.reduce(_||_)
   }
 
-  def display(cond: Bool, decimal: Boolean = true): Unit = {
+  def display(cond: Bool, decimal: Boolean = false): Unit = {
     // XSDebug(cond, p"-----------FTB entry----------- \n")
     val prefix = p"FTBEntry:"
     XSDebug(cond, prefix + p"v: ${valid}\n")
@@ -355,6 +355,18 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
       }
     }
   }
+  if(enableFTBPredictPrint){
+    val cond = true.B
+    XSDebug(cond, p"-------FTB predict for PC : 0x${Hexadecimal(RegNext(s1_pc))}-------\n")
+    XSDebug(cond, p"hit: ${RegNext(s1_hit)} hit_way: ${RegNext(s1_hit_way)} alloc_way: ${RegNext(alloc_way)}\n")
+    RegNext(s1_ftb_entry).display(cond)
+    XSDebug(cond, p"--input--\n")
+    io.resp_in(0).f2.display(cond)
+    XSDebug(cond, p"--output--\n")
+    io.resp.f2.display(cond)
+    XSDebug(cond, p"-----------------------------------\n")
+  }
+
   when(RegNext(RegNext(s1_hit && !s1_hit_fallthrough_error))) {
     io.resp.f3.fromFtbEntry(RegNext(RegNext(s1_ftb_entry)), RegNext(RegNext(s1_pc)))
     io.resp.f3.hit := true.B
@@ -376,7 +388,7 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
     val printCond = u.valid
     val watchCond = u.valid && u.bits.pc === watchPC.U
     val cond = if(enableFTBUpdateDetailPrint) printCond else watchCond
-    XSDebug(cond, p"-------FTB update entry for PC : ${u.bits.pc}-------\n")
+    XSDebug(cond, p"-------FTB update entry for PC : 0x${Hexadecimal(u.bits.pc)}-------\n")
     u.bits.display(cond)
     XSDebug(cond, p"-----------------------------------\n")
   }
