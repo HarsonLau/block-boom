@@ -8,7 +8,7 @@ import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
 
 import boom.common._
-import boom.util.{BoomCoreStringPrefix, WrapInc}
+import boom.util._
 import scala.math.min
 
 
@@ -55,6 +55,16 @@ class BlockBIM(params: BlockBIMParams = BlockBIMParams())(implicit p: Parameters
 
   val s2_resp         = Wire(Vec(numBr, Bool()))
 
+  if(enableBIMPredictPrint){
+    val cond = true.B
+    XSDebug(cond, p"---------BIM: PC 0x${Hexadecimal(s2_pc)}}-----------\n")
+    XSDebug(cond, p"BIM Read index: 0x${Hexadecimal(RegNext(RegNext(s0_idx)))}\n")
+    for (w <- 0 until numBr) {
+      XSDebug(cond, p"BIM: s2_req_rdata(${w.U}) = 0x${Hexadecimal(s2_req_rdata(w))}\n")
+    }
+    XSDebug(cond, p"-------------------------------\n")
+  }
+
   for (w <- 0 until numBr) {
 
     s2_resp(w)        := s2_valid && s2_req_rdata(w)(1) && !doing_reset // TODO: FTB entry should be used
@@ -78,7 +88,7 @@ class BlockBIM(params: BlockBIMParams = BlockBIMParams())(implicit p: Parameters
     s1_update.bits.ftb_entry.valid &&
     s1_update.bits.ftb_entry.brValids(w) &&
     s1_update.valid &&
-    !s1_update.bits.ftb_entry.always_taken(w) &&
+    // !s1_update.bits.ftb_entry.always_taken(w) &&
     !(PriorityEncoder(s1_update.bits.br_taken_mask) < w.U)))
 
   val wrbypass_idxs = Reg(Vec(nWrBypassEntries, UInt(log2Ceil(nSets).W)))
@@ -130,14 +140,23 @@ class BlockBIM(params: BlockBIMParams = BlockBIMParams())(implicit p: Parameters
 
   }
 
-  when (doing_reset || (s1_update.valid && s1_update.bits.is_commit_update)) {
-    data.write(
-      Mux(doing_reset, reset_idx, s1_update_index),
-      Mux(doing_reset, VecInit(Seq.fill(numBr) { 2.U }), s1_update_wdata),
-      Mux(doing_reset, (~(0.U(numBr.W))), s1_update_wmask.asUInt).asBools
-    )
+  when (doing_reset || (s1_update.valid && s1_update_wmask.reduce(_||_))) {
+    val write_index = Mux(doing_reset, reset_idx, s1_update_index)
+    val write_data = Mux(doing_reset, VecInit(Seq.fill(numBr) { 1.U(2.W) }), s1_update_wdata)
+    val write_mask = Mux(doing_reset, (~(0.U(numBr.W))), s1_update_wmask.asUInt).asBools
+    data.write(write_index, write_data, write_mask)
+    if(enableBIMUpdatePrint){
+      val cond = true.B 
+      XSDebug(cond, p"----------BIM update----------\n")
+      XSDebug(cond, p"BIM: write index 0x${Hexadecimal(write_index)} pc 0x${Hexadecimal(RegNext(io.update.bits.pc))}\n")
+      for (w <- 0 until numBr) {
+        XSDebug(cond, p"BIM: write data(${w.U}) = 0x${Hexadecimal(write_data(w))} mask(${w.U}) = ${write_mask(w)}\n")
+      }
+      XSDebug(cond, p"-------------------------------\n")
+    }
   }
-  when (s1_update_wmask.reduce(_||_) && s1_update.valid && s1_update.bits.is_commit_update) {
+
+  when (s1_update_wmask.reduce(_||_) && s1_update.valid) {
     when (wrbypass_hit) {
       wrbypass(wrbypass_hit_idx) := s1_update_wdata
     } .otherwise {
