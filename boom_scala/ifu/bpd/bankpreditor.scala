@@ -502,6 +502,7 @@ abstract class BlockPredictorBank(implicit p: Parameters) extends BoomModule()(p
   val s0_pc = io.f0_pc
   val s1_pc = RegNext(s0_pc)
   val s2_pc = RegNext(s1_pc)
+  val s3_pc = RegNext(s2_pc)
 
   val s0_update     = io.update
   val s0_update_idx = blockFetchIdx(io.update.bits.pc)
@@ -603,7 +604,7 @@ class BlockPredictor(implicit p:Parameters) extends BoomModule()(p)
   // Update
   predictors.io.update.bits.is_mispredict_update := io.update.bits.is_mispredict_update
   predictors.io.update.bits.is_repair_update := io.update.bits.is_repair_update
-  predictors.io.update.bits.meta := io.update.bits.meta(0)
+  predictors.io.update.bits.meta := io.update.bits.meta
   predictors.io.update.bits.lhist := io.update.bits.lhist
   predictors.io.update.bits.cfi_idx.bits := io.update.bits.cfi_idx.bits
   predictors.io.update.bits.cfi_taken := io.update.bits.cfi_taken
