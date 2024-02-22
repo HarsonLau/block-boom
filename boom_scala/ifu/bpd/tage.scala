@@ -23,7 +23,7 @@ class TageResp extends Bundle {
 
 class TageTable(val nColumns: Int, val nRows: Int, val tagSz: Int, val histLength: Int, val uBitPeriod: Int)
   (implicit p: Parameters) extends BoomModule()(p)
-  with HasBoomFrontendParameters
+  with HasBoomFTBParameters
 {
   require(histLength <= globalHistoryLength)
 
@@ -84,7 +84,8 @@ class TageTable(val nColumns: Int, val nRows: Int, val tagSz: Int, val histLengt
 
   val tageEntrySz = 1 + tagSz + 3
 
-  val (s1_hashed_idx, s1_tag) = compute_tag_and_hash(fetchIdx(io.f1_req_pc), io.f1_req_ghist)
+  // Note: blockFetchIdx is for FTB
+  val (s1_hashed_idx, s1_tag) = compute_tag_and_hash(blockFetchIdx(io.f1_req_pc), io.f1_req_ghist)
 
   val hi_us  = SyncReadMem(nRows, Vec(nColumns, Bool()))
   val lo_us  = SyncReadMem(nRows, Vec(nColumns, Bool()))
@@ -114,7 +115,8 @@ class TageTable(val nColumns: Int, val nRows: Int, val tagSz: Int, val histLengt
   val doing_clear_u_lo = doing_clear_u && clear_u_ctr(log2Ceil(uBitPeriod) + log2Ceil(nRows)) === 0.U
   val clear_u_idx = clear_u_ctr >> log2Ceil(uBitPeriod)
 
-  val (update_idx, update_tag) = compute_tag_and_hash(fetchIdx(io.update_pc), io.update_hist)
+  // Note: blockFetchIdx is for FTB
+  val (update_idx, update_tag) = compute_tag_and_hash(blockFetchIdx(io.update_pc), io.update_hist)
 
   val update_wdata = Wire(Vec(nColumns, new TageEntry))
 

@@ -67,7 +67,6 @@ class BlockTage(params: BlockTageParams = BlockTageParams())(implicit p: Paramet
   //   !(PriorityEncoder(s1_update.bits.br_taken_mask) < w.U)))
 
   val s1_update_meta = s1_update.bits.meta.asTypeOf(new TageMeta)
-  val s1_update_mispredict_mask = s1_update.bits.mispred_mask 
 
   val s1_update_mask  = WireInit((0.U).asTypeOf(Vec(tageNTables, Vec(nColumns, Bool()))))
   val s1_update_u_mask  = WireInit((0.U).asTypeOf(Vec(tageNTables, Vec(nColumns, UInt(1.W)))))
@@ -124,10 +123,13 @@ class BlockTage(params: BlockTageParams = BlockTageParams())(implicit p: Paramet
     f3_meta.allocate(w).valid := allocatable_slots =/= 0.U
     f3_meta.allocate(w).bits  := alloc_entry
 
+    val s1_slot_offset = s1_update.bits.ftb_entry.getOffsetVec(w)
+    val s1_slot_mispredicted = s1_update.bits.cfi_idx.valid && (s1_update.bits.cfi_idx.bits === s1_slot_offset) && s1_update.bits.cfi_mispredicted
     val update_was_taken = (s1_update.bits.cfi_idx.valid &&
                             (s1_update.bits.cfi_idx.bits === s1_update.bits.ftb_entry.getOffsetVec(w)) &&
                             s1_update.bits.cfi_taken)
-    when (s1_update.bits.br_mask(w) && s1_update.valid && s1_update.bits.is_commit_update) {
+  
+    when (s1_update.bits.br_mask(s1_slot_offset) && s1_update.valid && s1_update.bits.is_commit_update) {
       when (s1_update_meta.provider(w).valid) {
         val provider = s1_update_meta.provider(w).bits
 
@@ -136,7 +138,7 @@ class BlockTage(params: BlockTageParams = BlockTageParams())(implicit p: Paramet
 
         val new_u = inc_u(s1_update_meta.provider_u(w),
                           s1_update_meta.alt_differs(w),
-                          s1_update_mispredict_mask(w))
+                          s1_slot_mispredicted)
         s1_update_u      (provider)(w) := new_u
         s1_update_taken  (provider)(w) := update_was_taken
         s1_update_old_ctr(provider)(w) := s1_update_meta.provider_ctr(w)
@@ -153,6 +155,7 @@ class BlockTage(params: BlockTageParams = BlockTageParams())(implicit p: Paramet
 
     val allocate = s1_update_meta.allocate(idx)
     when (allocate.valid) {
+      XSDebug(true.B, p"Tage Allocate for idx ${idx} with table ${allocate.bits}\n")
       s1_update_mask (allocate.bits)(idx) := true.B
       s1_update_taken(allocate.bits)(idx) := s1_update.bits.cfi_taken
       s1_update_alloc(allocate.bits)(idx) := true.B
@@ -161,6 +164,7 @@ class BlockTage(params: BlockTageParams = BlockTageParams())(implicit p: Paramet
       s1_update_u     (allocate.bits)(idx) := 0.U
 
     } .otherwise {
+      XSDebug(true.B, p"Tage Decr useful for idx ${idx}\n")
       val provider = s1_update_meta.provider(idx)
       val decr_mask = Mux(provider.valid, ~MaskLower(UIntToOH(provider.bits)), 0.U)
 
@@ -192,4 +196,31 @@ class BlockTage(params: BlockTageParams = BlockTageParams())(implicit p: Paramet
 
   //io.f3_meta := Cat(f3_meta.asUInt, micro.io.f3_meta(micro.metaSz-1,0), base.io.f3_meta(base.metaSz-1, 0))
   io.resp.f3_meta := f3_meta.asUInt
+  if(enableTagePredictPrint) {
+    val cond = true.B
+    XSDebug(cond, p"-----------BlockTage Predict for PC 0x${Hexadecimal(s3_pc)}-----------\n")
+    XSDebug(cond, p"provider: ${f3_meta.provider}\n")
+    XSDebug(cond, p"provider_u: ${f3_meta.provider_u}\n")
+    XSDebug(cond, p"provider_ctr: ${f3_meta.provider_ctr}\n")
+    XSDebug(cond, p"allocate: ${f3_meta.allocate}\n")
+    XSDebug(cond, p"alt_differs: ${f3_meta.alt_differs}\n")
+    XSDebug(cond, p"------------------------------------------------------------\n")
+  }
+
+  if(enableTageUpdatePrint) {
+    val cond = true.B
+    XSDebug(cond, p"-----------BlockTage Update for PC 0x${Hexadecimal(s1_update.bits.pc)}-----------\n")
+    // XSDebug(cond, p"mis-predict mask: 0b${Binary(s1_update_mispredict_mask.asUInt)}\n")
+    XSDebug(cond, p"UpdateAllocate: ${s1_update_meta.allocate}\n")
+    for (tt <- 0 until tageNTables) {
+      XSDebug(cond, p"Table ${tt}:")
+      XSDebug(cond, p"update_mask: ${s1_update_mask(tt)} ")
+      XSDebug(cond, p"update_taken: ${s1_update_taken(tt)} ")
+      XSDebug(cond, p"update_alloc: ${s1_update_alloc(tt)} ")
+      XSDebug(cond, p"update_u_mask: ${s1_update_u_mask(tt)} ")
+      XSDebug(cond, p"update_u: ${s1_update_u(tt)}\n")
+      XSDebug(cond, p"update_old_ctr: ${s1_update_old_ctr(tt)}\n")
+    }
+    XSDebug(cond, p"------------------------------------------------------------\n")
+  }
 }
