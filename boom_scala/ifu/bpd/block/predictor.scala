@@ -462,6 +462,7 @@ abstract class BlockPredictorBank(implicit p: Parameters) extends BoomModule()(p
 {
   val metaSz = 0
   def nInputs = 1
+  val mems: Seq[Tuple3[String, Int, Int]]
 
   // val mems: Seq[Tuple3[String, Int, Int]]
 
@@ -545,21 +546,21 @@ class BlockPredictor(implicit p:Parameters) extends BoomModule()(p)
     val update = Input(Valid(new BlockUpdate))
   })
 
+  var total_memsize = 0
   val bpdStr = new StringBuilder
   bpdStr.append(BoomCoreStringPrefix("==Branch Predictor Memory Sizes==\n")) // TODO: fixme
-  // val banked_predictors = (0 until nBPBanks) map ( b => {
-  //   val m = Module(if (useBPD) new ComposedBranchPredictorBank else new NullBranchPredictorBank)
-  //   for ((n, d, w) <- m.mems) {
-  //     bpdStr.append(BoomCoreStringPrefix(f"bank$b $n: $d x $w = ${d * w / 8}"))
-  //     total_memsize = total_memsize + d * w / 8
-  //   }
-  //   m
-  // })
-  // bpdStr.append(BoomCoreStringPrefix(f"Total bpd size: ${total_memsize / 1024} KB\n"))
+  val predictors = {
+    val m = Module(if (useBPD) new ComposedBlockPredictorBank else new NullBlockPredictorBank)
+    for ((n, d, w) <- m.mems) {
+      bpdStr.append(BoomCoreStringPrefix(f"$n: $d x $w = ${d * w / 8}"))
+      total_memsize = total_memsize + d * w / 8
+    }
+    m
+  }
+  bpdStr.append(BoomCoreStringPrefix(f"Total bpd size: ${total_memsize / 1024} KB\n"))
   override def toString: String = bpdStr.toString
 
   // val predictors = Module (new NullBlockPredictorBank)
-  val predictors = Module (new ComposedBlockPredictorBank)
   val lhist_providers = Module(if(localHistoryNSets > 0) new LocalBranchPredictorBank else new NullLocalBranchPredictorBank)
 
   lhist_providers.io.f0_valid := io.f0_req.valid

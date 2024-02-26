@@ -41,5 +41,5 @@ class ComposedBlockPredictorBank(implicit p: Parameters) extends BlockPredictorB
     update_meta = update_meta >> c.metaSz
   }
 
-  // val mems = components.map(_.mems).flatten
+  val mems = components.map(_.mems).flatten
 }

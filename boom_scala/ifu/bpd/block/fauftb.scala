@@ -80,6 +80,8 @@ class FauFTB(implicit p: Parameters) extends BlockPredictorBank with FauFTBParam
   val replacer = ReplacementPolicy.fromString("plru", numWays)
   val replacer_touch_ways = Wire(Vec(2, Valid(UInt(log2Ceil(numWays).W))))
 
+  val mems = Nil
+
   // pred req
   ways.foreach(_.io.req_tag := getTag(s1_pc)) // use the F1 pc as the BOOM.ubtb and XiangShan.FauFTB do
   

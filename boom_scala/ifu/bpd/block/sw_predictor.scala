@@ -55,6 +55,7 @@ class SwBlockPredictorBank(implicit p: Parameters) extends BlockPredictorBank()(
     // // The Harness to software assumes output comes out in f2
     // io.resp.f3(w).is_br := RegNext(pred_harness.io.req_taken)
     // io.resp.f3(w).taken := RegNext(pred_harness.io.req_taken)
+  val mems = Nil
 }
 
 class FauFTBHarness(implicit p: Parameters)
