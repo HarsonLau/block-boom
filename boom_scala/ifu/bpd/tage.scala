@@ -268,6 +268,8 @@ class TageBranchPredictorBank(params: BoomTageParams = BoomTageParams())(implici
       when (hit) {
         io.resp.f3(w).taken := Mux(ctr === 3.U || ctr === 4.U, altpred, ctr(2))
         final_altpred       := altpred
+        io.resp.f3(w).perf.tage_hit   := true.B
+        io.resp.f3(w).perf.tage_taken := io.resp.f3(w).taken
       }
 
       provided = provided || hit

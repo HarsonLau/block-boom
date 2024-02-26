@@ -18,7 +18,7 @@ case class BoomMicroBTBParams(
 
 class MicroBTBBranchPredictorBank(params: BoomMicroBTBParams)(implicit p: Parameters) extends BranchPredictorBank()(p)
 {
-  override val nSets         = params.nSets
+  override val nSets         = params.nSets / nBanks
   val tagSz         = vaddrBitsExtended - log2Ceil(nSets) - log2Ceil(fetchWidth) - 1
   val offsetSz      = params.offsetSz
   val nWrBypassEntries = 2

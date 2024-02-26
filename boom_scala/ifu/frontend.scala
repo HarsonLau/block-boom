@@ -294,6 +294,8 @@ class FetchBundle(implicit p: Parameters) extends BoomBundle
   val tsrc    = UInt(BSRC_SZ.W)
 //TODO: add FTB Entry here to support FTB
   val ftb_entry = new FTBEntry
+
+  // val bpd_perf      = Vec(fetchWidth, new BranchPredictionPerf)
 }
 
 
@@ -343,7 +345,27 @@ class BoomFrontendIO(implicit p: Parameters) extends BoomBundle
   val bpsrc_f2 = Input(Bool())
   val bpsrc_f3 = Input(Bool())
   val bpsrc_core = Input(Bool())
-  
+
+  // val fetchbuffer_inst_count = Input(UInt(log2Ceil(numFetchBufferEntries+1).W))
+  val fetchbuffer_empty = Input(Bool())
+  val fetchbuffer_full = Input(Bool())
+  val fetchbuffer_1_8 = Input(Bool())
+  val fetchbuffer_2_8 = Input(Bool())
+  val fetchbuffer_3_8 = Input(Bool())
+  val fetchbuffer_4_8 = Input(Bool())
+  val fetchbuffer_5_8 = Input(Bool())
+  val fetchbuffer_6_8 = Input(Bool())
+  val fetchbuffer_7_8 = Input(Bool())
+  val fetchbuffer_8_8 = Input(Bool())
+
+  val flush_fetchbuffer_1_8 = Input(Bool())
+  val flush_fetchbuffer_2_8 = Input(Bool())
+  val flush_fetchbuffer_3_8 = Input(Bool())
+  val flush_fetchbuffer_4_8 = Input(Bool())
+  val flush_fetchbuffer_5_8 = Input(Bool())
+  val flush_fetchbuffer_6_8 = Input(Bool())
+  val flush_fetchbuffer_7_8 = Input(Bool())
+  val flush_fetchbuffer_8_8 = Input(Bool())
 }
 
 /**
@@ -820,7 +842,8 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   f3_fetch_bundle.fsrc := f3_imemresp.fsrc
   f3_fetch_bundle.tsrc := f3_imemresp.tsrc
   f3_fetch_bundle.shadowed_mask := f3_shadowed_mask
-
+  //f3_fetch_bundle.bpd_perf := f3_bpd_resp.io.deq.bits.preds.map(_.perf)
+  
   val f3_recorded_cfi_mask = Wire(Vec(fetchWidth, Bool()))
   for(i <- 0 until fetchWidth) {
     f3_recorded_cfi_mask(i) := n_f3_bpd_resp.io.deq.bits.pred.validPredict(i.U)
@@ -1244,6 +1267,28 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     Module(new Queue(new FetchBundle, 1, pipe=true, flow=false))}
 
   val fb  = Module(new FetchBuffer)
+  // io.cpu.fetchbuffer_inst_count := fb.io.count
+  io.cpu.fetchbuffer_empty := fb.io.count === 0.U
+  io.cpu.fetchbuffer_full  := fb.io.count === numFetchBufferEntries.U
+  io.cpu.fetchbuffer_1_8 := fb.io.count <= (numFetchBufferEntries/8).U
+  io.cpu.fetchbuffer_2_8 := fb.io.count <= (numFetchBufferEntries/4).U && fb.io.count > (numFetchBufferEntries/8).U
+  io.cpu.fetchbuffer_3_8 := fb.io.count <= (numFetchBufferEntries/8 * 3).U && fb.io.count > (numFetchBufferEntries/8 * 2).U
+  io.cpu.fetchbuffer_4_8 := fb.io.count <= (numFetchBufferEntries/2).U && fb.io.count > (numFetchBufferEntries/8 * 3).U
+  io.cpu.fetchbuffer_5_8 := fb.io.count <= (numFetchBufferEntries/8 * 5).U && fb.io.count > (numFetchBufferEntries/8 * 4).U
+  io.cpu.fetchbuffer_6_8 := fb.io.count <= (numFetchBufferEntries/4 * 3).U && fb.io.count > (numFetchBufferEntries/8 * 5).U
+  io.cpu.fetchbuffer_7_8 := fb.io.count <= (numFetchBufferEntries/8 * 7).U && fb.io.count > (numFetchBufferEntries/8 * 6).U
+  io.cpu.fetchbuffer_8_8 := fb.io.count <= (numFetchBufferEntries).U && fb.io.count > (numFetchBufferEntries/8 * 7).U 
+
+  io.cpu.flush_fetchbuffer_1_8 := fb.io.perf_clear && io.cpu.fetchbuffer_1_8
+  io.cpu.flush_fetchbuffer_2_8 := fb.io.perf_clear && io.cpu.fetchbuffer_2_8
+  io.cpu.flush_fetchbuffer_3_8 := fb.io.perf_clear && io.cpu.fetchbuffer_3_8
+  io.cpu.flush_fetchbuffer_4_8 := fb.io.perf_clear && io.cpu.fetchbuffer_4_8
+  io.cpu.flush_fetchbuffer_5_8 := fb.io.perf_clear && io.cpu.fetchbuffer_5_8
+  io.cpu.flush_fetchbuffer_6_8 := fb.io.perf_clear && io.cpu.fetchbuffer_6_8
+  io.cpu.flush_fetchbuffer_7_8 := fb.io.perf_clear && io.cpu.fetchbuffer_7_8
+  io.cpu.flush_fetchbuffer_8_8 := fb.io.perf_clear && io.cpu.fetchbuffer_8_8
+
+
   val ftq = Module(new FetchTargetQueue)
 
   // When we mispredict, we need to repair

@@ -17,3 +17,14 @@ gen.sh
 *.dump.*
 test.*.riscv
 test.riscv.*
+*.zip
+#ignore all files with postfix log
+*.log
+data/
+**samplectrl.txt
+**venv/
+boom_scala/ifu/bpd/gen.sh
+boom_scala/ifu/bpd/tage.template
+spec_run/4*/
+spec_run/999*/
+**.p

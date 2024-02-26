@@ -46,6 +46,8 @@ class FetchBuffer(implicit p: Parameters) extends BoomModule
     val enq = Flipped(Decoupled(new FetchBundle()))
     val deq = new DecoupledIO(new FetchBufferResp())
 
+    val count = Output(UInt(log2Ceil(numEntries+1).W))
+    val perf_clear = Output(Bool())
     // Was the pipeline redirected? Clear/reset the fetchbuffer.
     val clear = Input(Bool())
   })
@@ -86,6 +88,11 @@ class FetchBuffer(implicit p: Parameters) extends BoomModule
   // Input microops.
   val in_mask = Wire(Vec(fetchWidth, Bool()))
   val in_uops = Wire(Vec(fetchWidth, new MicroOp()))
+  val tail_rows = Wire(Vec(numRows, Bool()))
+
+  for (i <- 0 until numRows) {
+    tail_rows(i) := tail((i+1)*coreWidth-1, i*coreWidth).orR
+  }
 
   // Step 1: Convert FetchPacket into a vector of MicroOps.
   for (b <- 0 until nBanks) {
@@ -121,6 +128,7 @@ class FetchBuffer(implicit p: Parameters) extends BoomModule
       in_uops(i).bp_xcpt_if     := io.enq.bits.bp_xcpt_if_oh(i)
 
       in_uops(i).debug_fsrc     := io.enq.bits.fsrc
+      // in_uops(i).bpd_perf       := io.enq.bits.bpd_perf(i)
     }
   }
 
@@ -145,6 +153,14 @@ class FetchBuffer(implicit p: Parameters) extends BoomModule
         ram(j) := in_uops(i)
       }
     }
+  }
+
+  when(head === tail_rows.asUInt){
+    io.count := 0.U
+  }.otherwise{
+    val head_idx = OHToUInt(head)
+    val tail_idx = OHToUInt(tail_rows.asUInt)
+    io.count := Mux(tail_idx > head_idx, (tail_idx - head_idx) * coreWidth.asUInt, (tail_idx + numRows.U - head_idx) * coreWidth.asUInt)
   }
 
   //-------------------------------------------------------------
@@ -188,7 +204,10 @@ class FetchBuffer(implicit p: Parameters) extends BoomModule
   when (io.clear) {
     head := 1.U
     tail := 1.U
+    io.perf_clear := true.B
     maybe_full := false.B
+  }.otherwise{
+    io.perf_clear := false.B
   }
 
   // TODO Is this necessary?
