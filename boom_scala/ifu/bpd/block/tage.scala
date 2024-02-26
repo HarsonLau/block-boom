@@ -14,12 +14,12 @@ import scala.math.min
 
 case class BlockTageParams(
   //                                           nSets, histLen, tagSz
-  tableInfo: Seq[Tuple3[Int, Int, Int]] = Seq((  128,       2,     7),
-                                              (  128,       4,     7),
-                                              (  256,       8,     8),
-                                              (  256,      16,     8),
-                                              (  128,      32,     9),
-                                              (  128,      64,     9)),
+  tableInfo: Seq[Tuple3[Int, Int, Int]] = Seq((  128 * 4 / 2,       2,     7),
+                                              (  128 * 4 / 2,       4,     7),
+                                              (  256 * 4 / 2,       8,     8),
+                                              (  256 * 4 / 2,      16,     8),
+                                              (  128 * 4 / 2,      32,     9),
+                                              (  128 * 4 / 2,      64,     9)),
   uBitPeriod: Int = 2048
 )
 
@@ -50,7 +50,7 @@ class BlockTage(params: BlockTageParams = BlockTageParams())(implicit p: Paramet
 
   val tt = params.tableInfo map {
     case (n, l, s) => {
-      val t = Module(new TageTable(nColumns,n, s, l, params.uBitPeriod))
+      val t = Module(new TageTable(nColumns, n, s, l, params.uBitPeriod))
       t.io.f1_req_valid := RegNext(io.f0_valid)
       t.io.f1_req_pc    := RegNext(io.f0_pc)
       t.io.f1_req_ghist := io.f1_ghist

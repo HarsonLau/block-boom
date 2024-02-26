@@ -20,7 +20,7 @@ class BlockBIMMeta(implicit p: Parameters) extends BoomBundle()(p)
 }
 
 case class BlockBIMParams(
-  nSets: Int = 2048 * 2
+  nSets: Int = 2048 * 4 / 2 // same slot count with original BIM
 )
 
 class BlockBIM(params: BlockBIMParams = BlockBIMParams())(implicit p: Parameters) extends BlockPredictorBank()(p)

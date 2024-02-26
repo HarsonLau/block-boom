@@ -14,8 +14,8 @@ import boom.util._
 import scala.math.min
 
 trait FTBParams extends HasBoomFTBParameters {
-  val numEntries = 2048
-  val numWays    = 4
+  val numEntries = 128 * 2 * 4 / 2
+  val numWays    = 2
   val numSets    = numEntries/numWays // 512
   val tagSize    = 20
 

@@ -10,13 +10,11 @@ import freechips.rocketchip.tilelink._
 import boom.common._
 import boom.util.{BoomCoreStringPrefix}
 
-
-class ComposedBranchPredictorBank(implicit p: Parameters) extends BranchPredictorBank()(p)
+class ComposedBlockPredictorBank(implicit p: Parameters) extends BlockPredictorBank()(p)
 {
 
-  val (components, resp) = getBPDComponents(io.resp_in(0), p)
+  val (components, resp) = getNewBPDComponents(io.resp_in(0), p)
   io.resp := resp
-
 
   var metas = 0.U(1.W)
   var meta_sz = 0
@@ -28,12 +26,12 @@ class ComposedBranchPredictorBank(implicit p: Parameters) extends BranchPredicto
     c.io.f1_lhist  := io.f1_lhist
     c.io.f3_fire   := io.f3_fire
     if (c.metaSz > 0) {
-      metas = (metas << c.metaSz) | c.io.f3_meta(c.metaSz-1,0)
+      metas = (metas << c.metaSz) | c.io.resp.f3_meta(c.metaSz-1,0) // TODO: ensure this is correct
     }
     meta_sz = meta_sz + c.metaSz
   }
   require(meta_sz < bpdMaxMetaLength)
-  io.f3_meta := metas
+  io.resp.f3_meta := metas
 
 
   var update_meta = io.update.bits.meta
@@ -43,6 +41,5 @@ class ComposedBranchPredictorBank(implicit p: Parameters) extends BranchPredicto
     update_meta = update_meta >> c.metaSz
   }
 
-  val mems = components.map(_.mems).flatten
-
+  // val mems = components.map(_.mems).flatten
 }
