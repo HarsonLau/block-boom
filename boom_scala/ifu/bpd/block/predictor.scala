@@ -47,6 +47,17 @@ class TableAddr(val idxBits: Int, val banks: Int)(implicit p: Parameters) extend
   def getBankIdx(x: UInt) = if (banks > 1) getIdx(x)(idxBits - 1, log2Up(banks)) else getIdx(x)
 }
 
+class BlockPredictionPerf(implicit p: Parameters) extends BoomBundle()(p){
+  val fauftb_hit = Bool()
+  val fauftb_taken = Bool()
+
+  val ftb_hit = Bool()
+  val bim_taken = Bool()
+
+  val tage_hit = Bool()
+  val tage_taken = Bool()
+}
+
 class BlockPrediction(implicit p: Parameters) extends BoomBundle()(p)
 with HasBoomFTBParameters
 {
@@ -70,6 +81,8 @@ with HasBoomFTBParameters
   // val call_is_rvc = Bool()
   val hit = Bool() // hit must be manually set
   val blockMask = Vec(predictWidth, Bool())
+
+  val perfs = Vec(numBr, new BlockPredictionPerf()) 
 
   // val predCycle = if (!env.FPGAPlatform) Some(UInt(64.W)) else None
 

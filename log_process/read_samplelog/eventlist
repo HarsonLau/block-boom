@@ -31,10 +31,10 @@ event 29,   iss_val_notFull
 event 30,   spec_miss_issuop
 event 31,   tage_br_hit
 event 32,   tage_br_misp
-event 33,   tage_jal_hit
-event 34,   tage_jal_misp
-event 35,   tage_jalr_hit
-event 36,   tage_jalr_misp
+event 33,   ftb_hit
+event 34,   bim_misp
+event 35,   fauftb_hit
+event 36,   fauftb_misp
 event 37,   dcache_nack_num
 event 38,   dcache_to_L2
 event 39,   exe_is_br

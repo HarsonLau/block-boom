@@ -87,6 +87,7 @@ class BlockTage(params: BlockTageParams = BlockTageParams())(implicit p: Paramet
     var provided = false.B
     var provider = 0.U
     io.resp.f3.br_taken_mask(w) := io.resp_in(0).f3.br_taken_mask(w)
+    io.resp.f3.perfs(w).tage_taken := io.resp.f3.br_taken_mask(w)
 
     for (i <- 0 until tageNTables) {
       val hit = f3_resps(i)(w).valid
@@ -94,6 +95,7 @@ class BlockTage(params: BlockTageParams = BlockTageParams())(implicit p: Paramet
       when (hit) {
         io.resp.f3.br_taken_mask(w) := Mux(ctr === 3.U || ctr === 4.U, altpred, ctr(2))
         final_altpred       := altpred
+        io.resp.f3.perfs(w).tage_hit := true.B
       }
 
       provided = provided || hit

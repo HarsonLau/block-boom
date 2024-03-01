@@ -73,7 +73,9 @@ class BlockBIM(params: BlockBIMParams = BlockBIMParams())(implicit p: Parameters
 
   for (w <- 0 until numBr) {
     io.resp.f2.br_taken_mask(w) := s2_resp(w)
+    io.resp.f2.perfs(w).bim_taken := s2_resp(w)
     io.resp.f3.br_taken_mask(w) := RegNext(io.resp.f2.br_taken_mask(w))
+    io.resp.f3.perfs(w).bim_taken := RegNext(io.resp.f2.perfs(w).bim_taken)
   }
   io.resp.f3_meta := RegNext(s2_meta.asUInt)
 

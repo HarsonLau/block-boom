@@ -589,14 +589,18 @@ class BoomCore(usingTrace: Boolean)(implicit p: Parameters) extends BoomModule
     val jal_masks         = VecInit(rob.io.commit.uops.map(_.is_jal)).asUInt
     val taken_masks       = VecInit(rob.io.commit.uops.map(_.taken)).asUInt
     val bpd_perfs = rob.io.commit.uops.map(_.bpd_perf)
+    val fauftb_hit_masks  = VecInit(bpd_perfs.map(_.fauftb_hit)).asUInt
+    val fauftb_taken_masks= VecInit(bpd_perfs.map(_.fauftb_taken)).asUInt
+    val ftb_hit_masks     = VecInit(bpd_perfs.map(_.ftb_hit)).asUInt
+    val bim_taken_masks   = VecInit(bpd_perfs.map(_.bim_taken)).asUInt
     val tage_hit_masks    = VecInit(bpd_perfs.map(_.tage_hit)).asUInt
     val tage_taken_masks  = VecInit(bpd_perfs.map(_.tage_taken)).asUInt
     event_counters.io.event_signals(31) := RegNext(PopCount(valid_masks & br_masks & tage_hit_masks))//br tage hit
     event_counters.io.event_signals(32) := RegNext(PopCount(valid_masks & br_masks & tage_hit_masks & (tage_taken_masks ^ taken_masks)))//br tage misp
-    event_counters.io.event_signals(33) := RegNext(PopCount(valid_masks & jal_masks & tage_hit_masks))//tage jal hit
-    event_counters.io.event_signals(34) := RegNext(PopCount(valid_masks & jal_masks & tage_hit_masks & (tage_taken_masks ^ taken_masks)))//tage jal misp
-    event_counters.io.event_signals(35) := RegNext(PopCount(valid_masks & jalr_masks & tage_hit_masks))//tage jalr hit
-    event_counters.io.event_signals(36) := RegNext(PopCount(valid_masks & jalr_masks & tage_hit_masks & (tage_taken_masks ^ taken_masks)))//tage jalr misp
+    event_counters.io.event_signals(33) := RegNext(PopCount(valid_masks & br_masks & ftb_hit_masks))//br ftb hit
+    event_counters.io.event_signals(34) := RegNext(PopCount(valid_masks & br_masks & ftb_hit_masks & (bim_taken_masks ^ taken_masks)))//br bim misp
+    event_counters.io.event_signals(35) := RegNext(PopCount(valid_masks & br_masks & fauftb_hit_masks))//br fauftb hit
+    event_counters.io.event_signals(36) := RegNext(PopCount(valid_masks & br_masks & fauftb_hit_masks & (fauftb_taken_masks ^ taken_masks)))//br fauftb misp
     
     event_counters.io.event_signals(37) :=  io.lsu.dcache_nack_num   //d-cache load & store nack number
     event_counters.io.event_signals(38) :=  Mux(io.lsu.perf.acquire, 1.U, 0.U) //dcache send req to next level number

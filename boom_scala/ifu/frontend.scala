@@ -295,6 +295,8 @@ class FetchBundle(implicit p: Parameters) extends BoomBundle
 //TODO: add FTB Entry here to support FTB
   val ftb_entry = new FTBEntry
 
+  val bpd_perf = Vec(fetchWidth, new BlockPredictionPerf())
+
   // val bpd_perf      = Vec(fetchWidth, new BranchPredictionPerf)
 }
 
@@ -842,11 +844,18 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   f3_fetch_bundle.fsrc := f3_imemresp.fsrc
   f3_fetch_bundle.tsrc := f3_imemresp.tsrc
   f3_fetch_bundle.shadowed_mask := f3_shadowed_mask
-  //f3_fetch_bundle.bpd_perf := f3_bpd_resp.io.deq.bits.preds.map(_.perf)
+  f3_fetch_bundle.bpd_perf := 0.U.asTypeOf(Vec(fetchWidth, new BlockPredictionPerf()))
   
   val f3_recorded_cfi_mask = Wire(Vec(fetchWidth, Bool()))
   for(i <- 0 until fetchWidth) {
     f3_recorded_cfi_mask(i) := n_f3_bpd_resp.io.deq.bits.pred.validPredict(i.U)
+  }
+  val f3_recorded_cfi_offset = n_f3_bpd_resp.io.deq.bits.pred.offsets
+  for(i <- 0 until numBr){
+    val offset = f3_recorded_cfi_offset(i)
+    when(f3_recorded_cfi_mask(offset)){
+      f3_fetch_bundle.bpd_perf(offset) := n_f3_bpd_resp.io.deq.bits.pred.perfs(i)
+    }
   }
   val f3_block_mask = n_f3_bpd_resp.io.deq.bits.pred.blockMask
   assert(f3_block_mask.asUInt =/= 0.U, "nbpd f3 blockMask is zero") // FTB

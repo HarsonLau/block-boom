@@ -350,6 +350,7 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
     io.resp.f2.fromFtbEntry(RegNext(s1_ftb_entry), RegNext(s1_pc))
     io.resp.f2.hit := true.B
     for (i <- 0 until numBr) {
+      io.resp.f2.perfs(i).ftb_hit := true.B
       when(RegNext(s1_ftb_entry.always_taken(i))) {
         io.resp.f2.br_taken_mask(i) := true.B
       }
@@ -371,6 +372,7 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
     io.resp.f3.fromFtbEntry(RegNext(RegNext(s1_ftb_entry)), RegNext(RegNext(s1_pc)))
     io.resp.f3.hit := true.B
     for(i <- 0 until numBr) {
+      io.resp.f3.perfs(i).ftb_hit := true.B
       when(RegNext(RegNext(s1_ftb_entry.always_taken(i))) && RegNext(RegNext(s1_ftb_entry.validSlots(i)))) {
         io.resp.f3.br_taken_mask(i) := true.B
       }
