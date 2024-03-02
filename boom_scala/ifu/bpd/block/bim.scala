@@ -86,7 +86,8 @@ class BlockBIM(params: BlockBIMParams = BlockBIMParams())(implicit p: Parameters
   val s1_update_meta    = s1_update.bits.meta.asTypeOf(new BlockBIMMeta)
   val s1_update_index   = s1_update_idx 
   val s1_br_update_valids  = VecInit((0 until numBr).map(w => 
-    !s1_update.bits.is_btb_mispredict_update &&
+    // !s1_update.bits.is_btb_mispredict_update &&
+    s1_update.bits.is_commit_update &&
     s1_update.bits.ftb_entry.valid &&
     s1_update.bits.ftb_entry.brValids(w) &&
     s1_update.valid &&
@@ -144,7 +145,7 @@ class BlockBIM(params: BlockBIMParams = BlockBIMParams())(implicit p: Parameters
 
   when (doing_reset || (s1_update.valid && s1_update_wmask.reduce(_||_))) {
     val write_index = Mux(doing_reset, reset_idx, s1_update_index)
-    val write_data = Mux(doing_reset, VecInit(Seq.fill(numBr) { 1.U(2.W) }), s1_update_wdata)
+    val write_data = Mux(doing_reset, VecInit(Seq.fill(numBr) { 2.U(2.W) }), s1_update_wdata)
     val write_mask = Mux(doing_reset, (~(0.U(numBr.W))), s1_update_wmask.asUInt).asBools
     data.write(write_index, write_data, write_mask)
     if(enableBIMUpdatePrint){
