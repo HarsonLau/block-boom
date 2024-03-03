@@ -163,7 +163,8 @@ class FauFTB(implicit p: Parameters) extends BlockPredictorBank with FauFTBParam
   val u_s0_br_update_valids =
     VecInit((0 until numBr).map(w =>
       u.valid &&
-      !u.bits.is_btb_mispredict_update &&
+      // !u.bits.is_btb_mispredict_update &&
+      u.bits.is_commit_update &&
       u.bits.ftb_entry.valid &&
       u_s0_entry_valid_slot_mask(w) &&  
       u.bits.ftb_entry.brValids(w) &&

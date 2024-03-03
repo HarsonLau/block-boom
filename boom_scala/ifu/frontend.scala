@@ -368,6 +368,8 @@ class BoomFrontendIO(implicit p: Parameters) extends BoomBundle
   val flush_fetchbuffer_6_8 = Input(Bool())
   val flush_fetchbuffer_7_8 = Input(Bool())
   val flush_fetchbuffer_8_8 = Input(Bool())
+
+  val ftb_entry_overflow = Input(Bool())
 }
 
 /**
@@ -1415,6 +1417,8 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   ftbEntryGen.is_jalr_target_modified := DontCare
   ftbEntryGen.is_always_taken_modified := DontCare
   ftbEntryGen.is_br_full := DontCare
+
+  io.cpu.ftb_entry_overflow := ftbEntryGen.is_br_full
 
   val out_entry = ftbEntryGen.new_entry
   if(enableF4FTBGenIOPrint || enableWatchPC){

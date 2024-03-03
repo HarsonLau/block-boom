@@ -643,6 +643,9 @@ class BoomCore(usingTrace: Boolean)(implicit p: Parameters) extends BoomModule
     event_counters.io.event_signals(72) :=  Mux(io.ifu.flush_fetchbuffer_6_8, 1.U, 0.U)
     event_counters.io.event_signals(73) :=  Mux(io.ifu.flush_fetchbuffer_7_8, 1.U, 0.U)
     event_counters.io.event_signals(74) :=  Mux(io.ifu.flush_fetchbuffer_8_8, 1.U, 0.U)
+    event_counters.io.event_signals(75) :=  Mux(io.ifu.ftb_entry_overflow, 1.U, 0.U)
+    event_counters.io.event_signals(76) :=  RegNext(PopCount(valid_masks & br_masks & (bim_taken_masks ^ taken_masks) & taken_masks))// br taken predict not taken
+    event_counters.io.event_signals(77) :=  RegNext(PopCount(valid_masks & br_masks & (bim_taken_masks ^ taken_masks) & (~taken_masks)))// br not taken predict taken
   }
   
 
