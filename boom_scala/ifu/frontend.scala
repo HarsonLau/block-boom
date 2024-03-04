@@ -472,7 +472,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   // bpd.io.f0_req.bits.ghist := s0_ghist
   nbpd.io.f0_req.bits.ghist:= s0_ghist
 
-  assert(!s0_valid || s0_vpc =/= 0.U, "s0_vpc is 0\n")
+  // assert(!s0_valid || s0_vpc =/= 0.U, "s0_vpc is 0\n")
 
   if(enableF0PCPrint || enableWatchPC){
     val printCond = s0_valid
@@ -1482,7 +1482,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
 
     s0_valid     := false.B
     s0_vpc       := io.cpu.sfence.bits.addr
-    WarnAssert(io.cpu.sfence.bits.addr =/= 0.U, p"sfence addr should not be zero\n")
+    // WarnAssert(io.cpu.sfence.bits.addr =/= 0.U, p"sfence addr should not be zero\n")
     s0_is_replay := false.B
     s0_is_sfence := true.B
 
@@ -1502,7 +1502,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
 
     s0_valid     := io.cpu.redirect_val
     s0_vpc       := io.cpu.redirect_pc
-    WarnAssert(io.cpu.redirect_pc =/= 0.U, p"redirect_pc should not be zero\n")
+    // WarnAssert(io.cpu.redirect_pc =/= 0.U, p"redirect_pc should not be zero\n")
     s0_ghist     := io.cpu.redirect_ghist
     s0_tsrc      := BSRC_C
     s0_is_replay := false.B

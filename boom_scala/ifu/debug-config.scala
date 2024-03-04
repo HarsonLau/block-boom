@@ -23,20 +23,22 @@ trait hasFTBDebugConfigs {
   val enableF1RedirectInfoPrint = false // print info about F1 NPC
   val enableF2RedirectInfoPrint = false // print info about F2 NPC
   val enableF2ZeroVPCPrint = false
-  val enableF3RedirectInfoPrint = true // print info about F3 redirect
+  val enableF3RedirectInfoPrint = false // print info about F3 redirect
   val enableF3ZeroVPCPrint = false
-  val enableF5RedirectInfoPrint = true// print info about F5 redirect
-  val enablePCTracePrint = true//
+  val enableF5RedirectInfoPrint = false// print info about F5 redirect
+  val enablePCTracePrint = false//
 
   val enableFTBUpdateDetailPrint = false
   val enableFTBPredictPrint = false
   val enableF1vsF2BPRespDiff = false
+  val enableFTBJsonPredictPrint = true
+  val enableFTBJsonInsertPrint = true
 
   val enableBIMPredictPrint = false
   val enableBIMUpdatePrint = false
 
-  val enableTagePredictPrint = true
-  val enableTageUpdatePrint = true
+  val enableTagePredictPrint = false
+  val enableTageUpdatePrint = false
 
   val enableCommitTracePrint = false
 }

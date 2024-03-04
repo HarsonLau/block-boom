@@ -19,11 +19,14 @@ def process_infos(startinfo, eventinfos):
     eventinfos.append(cal_fraction((eventinfos[53] + eventinfos[54]) * 1000, eventinfos[1], "com_misp_MPKI"))
 
     eventinfos.append(cal_fraction(eventinfos[1], eventinfos[0], "user_ipc"))
-    eventinfos.append(cal_fraction(eventinfos[32],eventinfos[49],"tage_br_misp_rate"))
-    eventinfos.append(cal_fraction(eventinfos[31],eventinfos[49],"tage_br_hit_rate"))
-    #eventinfos.append(cal_fraction(eventinfos[36],eventinfos[50],"tage_jalr_misp_rate"))
+    # eventinfos.append(cal_fraction(eventinfos[31],eventinfos[32],"f3_hit_misp_rate"))
+    eventinfos.append(cal_fraction(eventinfos[34],eventinfos[33],"f2_hit_misp_rate"))
+    eventinfos.append(cal_fraction(eventinfos[34] * 1000, eventinfos[1], "f2_misp_MPKI"))
+    eventinfos.append(cal_fraction(eventinfos[36],eventinfos[35],"f1_hit_misp_rate"))
+    eventinfos.append(cal_fraction(eventinfos[36] * 1000, eventinfos[1], "f1_misp_MPKI"))
+    eventinfos.append(cal_fraction(eventinfos[37],eventinfos[34],"t_false_rate"))
     #eventinfos.append(cal_fraction(eventinfos[35],eventinfos[50],"tage_jalr_hit_rate"))
-    eventinfos.append(cal_fraction(eventinfos[32],eventinfos[31],"tage_br_misp/hit"))
+    # eventinfos.append(cal_fraction(eventinfos[32],eventinfos[31],"tage_br_misp/hit"))
 
     eventinfos.append(cal_fraction(eventinfos[57], eventinfos[0], "fetch_buffer_empty_rate"))
 

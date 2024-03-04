@@ -35,8 +35,8 @@ event 33,   ftb_hit
 event 34,   bim_misp
 event 35,   fauftb_hit
 event 36,   fauftb_misp
-event 37,   dcache_nack_num
-event 38,   dcache_to_L2
+event 37,   f2_t_false
+event 38,   f2_nt_false
 event 39,   exe_is_br
 event 40,   exe_is_jalr
 event 41,   exe_is_ret
@@ -73,8 +73,8 @@ event 71,   com_loop_hit
 event 72,   com_loop_flip
 event 73,   com_loop_misp
 event 74,   npc_src_next
-event 75,   npc_src_bp1
-event 76,   npc_src_f2_icache
-event 77,   npc_src_f2_fb
+event 75,   ftb_over_flow_cnt
+event 76,   t_false
+event 77,   nt_false
 event 78,   npc_src_bp2
 event 79,   npc_src_bp3
