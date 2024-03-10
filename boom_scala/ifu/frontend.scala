@@ -802,7 +802,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   val f3_npc_plus4_mask = Wire(Vec(fetchWidth, Bool()))
   val f3_btb_mispredicts = Wire(Vec(fetchWidth, Bool()))
   f3_fetch_bundle.mask := f3_mask.asUInt
-  f3_fetch_bundle.br_mask := f3_br_mask.asUInt
+  // f3_fetch_bundle.br_mask := f3_br_mask.asUInt
   f3_fetch_bundle.pc := f3_imemresp.pc
   f3_fetch_bundle.ftq_idx := 0.U // This gets assigned later
   f3_fetch_bundle.xcpt_pf_if := f3_imemresp.xcpt.pf.inst
@@ -1105,6 +1105,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     f3_fetch_bundle.cfi_is_call, // cfi_is_call
     f3_fetch_bundle.cfi_is_ret // cfi_is_ret
   )
+  f3_fetch_bundle.br_mask := n_f3_bpd_resp.io.deq.bits.pred.brMask.asUInt & f3_mask.asUInt // branches
 
   if(enableWatchPC){
     val cond = f3_fetch_bundle.pc === watchPC.asUInt
