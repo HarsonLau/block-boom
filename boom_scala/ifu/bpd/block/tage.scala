@@ -150,7 +150,7 @@ class BlockTage(params: BlockTageParams = BlockTageParams())(implicit p: Paramet
     }
   }
 
-  when (s1_update.valid && s1_update.bits.is_commit_update && s1_update.bits.cfi_mispredicted && s1_update.bits.cfi_idx.valid) {
+  when (s1_update.valid && s1_update.bits.is_commit_update && s1_update.bits.cfi_mispredicted && s1_update.bits.cfi_idx.valid && s1_update.bits.br_mask(s1_update.bits.cfi_idx.bits)) {
     // the Vec mispred_mask is of length numBr + 1
     // extract the first numBr elements 
     val idx = s1_update.bits.mispredSlotIdx
@@ -209,6 +209,25 @@ class BlockTage(params: BlockTageParams = BlockTageParams())(implicit p: Paramet
     XSDebug(cond, p"------------------------------------------------------------\n")
   }
 
+  if(enableTageJsonPredictPrint){
+    /*
+    {
+      pc: 0xfda
+      history: 8080809
+      provider: -
+      provider_ctr:
+        allocate: 
+        alt_differs
+    }
+    
+    */
+    // print the information above in json format
+    val s3_ghist = RegNext(RegNext(io.f1_ghist))
+
+    printf("{\"action\":\"predict\",\"pc\":\"0x%x\", \"history\":\"0x%x\", \"provider\":\"%d\", \"provider_ctr\":\"%d\",  \"alt_differs\":\"%d\"}\n",
+      s3_pc, s3_ghist, f3_meta.provider.asUInt, f3_meta.provider_ctr.asUInt, f3_meta.alt_differs.asUInt)
+  }
+
   if(enableTageUpdatePrint) {
     val cond = true.B
     XSDebug(cond, p"-----------BlockTage Update for PC 0x${Hexadecimal(s1_update.bits.pc)}-----------\n")
@@ -224,5 +243,12 @@ class BlockTage(params: BlockTageParams = BlockTageParams())(implicit p: Paramet
       XSDebug(cond, p"update_old_ctr: ${s1_update_old_ctr(tt)}\n")
     }
     XSDebug(cond, p"------------------------------------------------------------\n")
+  }
+  if(enableTageJsonUpdatePrint){
+    when(io.update.valid && io.update.bits.is_commit_update){
+      // pc, history, cfi_mispredicted, cfi_idx, cfi_taken, br_mask, mispredSlotIdx
+      printf("{\"action\":\"update\", \"pc\":\"0x%x\", \"history\":\"0x%x\", \"cfi_mispredicted\":\"%d\", \"cfi_idx\":\"%d\", \"cfi_taken\":\"%d\", \"br_mask\":\"0x%x\", \"mispredSlotIdx\":\"%d\"}\n",
+        s1_update.bits.pc, s1_update.bits.ghist, s1_update.bits.cfi_mispredicted, s1_update.bits.cfi_idx.bits, s1_update.bits.cfi_taken, s1_update.bits.br_mask.asUInt, s1_update.bits.mispredSlotIdx)
+    }
   }
 }

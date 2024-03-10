@@ -31,14 +31,17 @@ trait hasFTBDebugConfigs {
   val enableFTBUpdateDetailPrint = false
   val enableFTBPredictPrint = false
   val enableF1vsF2BPRespDiff = false
-  val enableFTBJsonPredictPrint = true
-  val enableFTBJsonInsertPrint = true
+  val enableFTBJsonPredictPrint = false
+  val enableFTBJsonInsertPrint = false
 
   val enableBIMPredictPrint = false
   val enableBIMUpdatePrint = false
 
   val enableTagePredictPrint = false
   val enableTageUpdatePrint = false
+
+  val enableTageJsonPredictPrint = true
+  val enableTageJsonUpdatePrint = true
 
   val enableCommitTracePrint = false
 }

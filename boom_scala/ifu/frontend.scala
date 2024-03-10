@@ -59,18 +59,7 @@ class GlobalHistory(implicit p: Parameters) extends BoomBundle()(p)
   val ras_idx = UInt(log2Ceil(nRasEntries).W)
 
   def histories(bank: Int) = {
-    if (nBPBanks == 1) {
       old_history
-    } else {
-      require(nBPBanks == 2)
-      if (bank == 0) {
-        old_history
-      } else {
-        Mux(new_saw_branch_taken                            , old_history << 1 | 1.U,
-        Mux(new_saw_branch_not_taken                        , old_history << 1,
-                                                              old_history))
-      }
-    }
   }
 
   def ===(other: GlobalHistory): Bool = {
@@ -94,37 +83,12 @@ class GlobalHistory(implicit p: Parameters) extends BoomBundle()(p)
                                             MaskLower(cfi_idx_oh) & ~Mux(cfi_is_br && cfi_taken, cfi_idx_oh, 0.U(fetchWidth.W)),
                                             ~(0.U(fetchWidth.W)))
 
-    // if (nBPBanks == 1) {
-      // In the single bank case every bank sees the history including the previous bank
-      new_history := DontCare
-      new_history.current_saw_branch_not_taken := false.B
-      val saw_not_taken_branch = not_taken_branches =/= 0.U || current_saw_branch_not_taken
-      new_history.old_history := Mux(cfi_is_br && cfi_taken && cfi_valid   , histories(0) << 1 | 1.U,
-                                 Mux(saw_not_taken_branch                  , histories(0) << 1,
-                                                                             histories(0)))
-    // } 
-    // else {
-    //   // In the two bank case every bank ignore the history added by the previous bank
-    //   val base = histories(1)
-    //   val cfi_in_bank_0 = cfi_valid && cfi_taken && cfi_idx_fixed < BPBankWidth.U
-    //   val ignore_second_bank = cfi_in_bank_0 || mayNotBeDualBanked(addr)
-
-    //   val first_bank_saw_not_taken = not_taken_branches(BPBankWidth - 1,0) =/= 0.U || current_saw_branch_not_taken
-    //   new_history.current_saw_branch_not_taken := false.B
-    //   when (ignore_second_bank) {
-    //     new_history.old_history := histories(1)
-    //     new_history.new_saw_branch_not_taken := first_bank_saw_not_taken
-    //     new_history.new_saw_branch_taken     := cfi_is_br && cfi_in_bank_0
-    //   } .otherwise {
-    //     new_history.old_history := Mux(cfi_is_br && cfi_in_bank_0                             , histories(1) << 1 | 1.U,
-    //                                Mux(first_bank_saw_not_taken                               , histories(1) << 1,
-    //                                                                                             histories(1)))
-
-    //     new_history.new_saw_branch_not_taken := not_taken_branches(fetchWidth-1, BPBankWidth) =/= 0.U
-    //     new_history.new_saw_branch_taken     := cfi_valid && cfi_taken && cfi_is_br && !cfi_in_bank_0
-
-    //   }
-    // }
+    new_history := DontCare
+    new_history.current_saw_branch_not_taken := false.B
+    val saw_not_taken_branch = not_taken_branches =/= 0.U || current_saw_branch_not_taken
+    new_history.old_history := Mux(cfi_is_br && cfi_taken && cfi_valid   , histories(0) << 1 | 1.U,
+                                Mux(saw_not_taken_branch                  , histories(0) << 1,
+                                                                            histories(0)))
     new_history.ras_idx := Mux(cfi_valid && cfi_is_call, WrapInc(ras_idx, nRasEntries),
                            Mux(cfi_valid && cfi_is_ret , WrapDec(ras_idx, nRasEntries), ras_idx))
     new_history
@@ -559,14 +523,14 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   //   false.B)
   
   val n_f1_predicted_ghist = s1_ghist.update(
-    n_s1_bpd_resp.pred.brMask.asUInt & f1_mask.asUInt,
-    n_s1_bpd_resp.pred.real_slot_taken() && n_f1_do_redirect,
-    n_s1_bpd_resp.pred.hit_taken_on_br,
-    n_f1_redirect_idx,
-    n_f1_do_redirect,
-    s1_vpc,
-    false.B,
-    false.B)
+    n_s1_bpd_resp.pred.brMask.asUInt & f1_mask.asUInt, // branches
+    n_s1_bpd_resp.pred.real_slot_taken() && n_f1_do_redirect, // cfi_taken
+    n_s1_bpd_resp.pred.hit_taken_on_br, //cfi_is_br
+    n_f1_redirect_idx, // cfi_idx
+    n_f1_do_redirect, // cfi_valid
+    s1_vpc, // addr
+    false.B, // cfi_is_call
+    false.B) // cfi_is_ret
 
   if(enableWatchPC){
     val f1_ghist_branches = n_s1_bpd_resp.pred.brMask.asUInt & f1_mask.asUInt
@@ -662,14 +626,14 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   //   false.B,
   //   false.B)
   val n_f2_predicted_ghist = s2_ghist.update(
-    n_f2_bpd_resp.pred.brMask.asUInt & f2_mask.asUInt,
-    n_f2_bpd_resp.pred.real_slot_taken() && n_f2_do_redirect,
-    n_f2_bpd_resp.pred.hit_taken_on_br,
-    n_f2_redirect_idx,
-    n_f2_do_redirect,
-    s2_vpc,
-    false.B,
-    false.B)
+    n_f2_bpd_resp.pred.brMask.asUInt & f2_mask.asUInt, // branches
+    n_f2_bpd_resp.pred.real_slot_taken() && n_f2_do_redirect, // cfi_taken
+    n_f2_bpd_resp.pred.hit_taken_on_br, // cfi_is_br
+    n_f2_redirect_idx, // cfi_idx
+    n_f2_do_redirect, // cfi_valid
+    s2_vpc, // addr
+    false.B, // cfi_is_call
+    false.B) // cfi_is_ret
 
   if(enableWatchPC){
     val f2_ghist_branches = n_f2_bpd_resp.pred.brMask.asUInt & f2_mask.asUInt
@@ -1132,15 +1096,14 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
 
   f3_fetch_bundle.next_pc       := f3_predicted_target
   val f3_predicted_ghist = f3_fetch_bundle.ghist.update(
-    n_f3_bpd_resp.io.deq.bits.pred.brMask.asUInt & f3_mask.asUInt,
-    // f3_fetch_bundle.br_mask,
-    f3_fetch_bundle.cfi_idx.valid,
-    f3_fetch_bundle.br_mask(f3_fetch_bundle.cfi_idx.bits),
-    f3_fetch_bundle.cfi_idx.bits,
-    f3_fetch_bundle.cfi_idx.valid,
-    f3_fetch_bundle.pc,
-    f3_fetch_bundle.cfi_is_call,
-    f3_fetch_bundle.cfi_is_ret
+    n_f3_bpd_resp.io.deq.bits.pred.brMask.asUInt & f3_mask.asUInt, // branches
+    f3_fetch_bundle.cfi_idx.valid, // cfi_taken
+    f3_fetch_bundle.br_mask(f3_fetch_bundle.cfi_idx.bits), // cfi_is_br
+    f3_fetch_bundle.cfi_idx.bits, // cfi_idx
+    f3_fetch_bundle.cfi_idx.valid, // cfi_valid
+    f3_fetch_bundle.pc, // addr
+    f3_fetch_bundle.cfi_is_call, // cfi_is_call
+    f3_fetch_bundle.cfi_is_ret // cfi_is_ret
   )
 
   if(enableWatchPC){
@@ -1234,6 +1197,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   f4_btb_corrections.io.enq.bits.pd                   := f3_fetch_bundle.pd
   f4_btb_corrections.io.enq.bits.ftb_entry            := f3_fetch_bundle.ftb_entry
   f4_btb_corrections.io.enq.bits.cfi_taken            := false.B
+  f4_btb_corrections.io.enq.bits.cfi_mispredicted     := false.B
 
   when(f4_btb_corrections.io.enq.valid){
     assert(f4_btb_corrections.io.enq.bits.cfi_idx.valid, "when f4_btb_corrections.io.enq.valid, cfi_idx should be valid")
