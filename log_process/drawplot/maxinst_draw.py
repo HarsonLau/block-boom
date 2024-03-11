@@ -244,20 +244,23 @@ def drawplot(resname):
     leftnames = ['exe_misp_MPKI']
     figs.append(draw_lines(xvalue, leftnames, [], xlabel, "MPKI", ""))
 
-    leftnames = ['fetch_buffer_1_8_perc','fetch_buffer_2_8_perc','fetch_buffer_3_8_perc','fetch_buffer_4_8_perc','fetch_buffer_5_8_perc','fetch_buffer_6_8_perc','fetch_buffer_7_8_perc','fetch_buffer_8_8_perc']
-    figs.append(draw_pecetage(xvalue, leftnames, [], xlabel, "Fetch Buffer Occupancy", ""))
+    leftnames = ['com_misp_MPKI']
+    figs.append(draw_lines(xvalue, leftnames, [], xlabel, "MPKI", ""))
 
-    leftnames = ['f2_hit_misp_rate']
-    figs.append(draw_pecetage(xvalue, leftnames, [], xlabel, "F2 Misprediction Rate", ""))
+    # leftnames = ['fetch_buffer_1_8_perc','fetch_buffer_2_8_perc','fetch_buffer_3_8_perc','fetch_buffer_4_8_perc','fetch_buffer_5_8_perc','fetch_buffer_6_8_perc','fetch_buffer_7_8_perc','fetch_buffer_8_8_perc']
+    # figs.append(draw_pecetage(xvalue, leftnames, [], xlabel, "Fetch Buffer Occupancy", ""))
 
-    leftnames = ['f1_hit_misp_rate']
-    figs.append(draw_pecetage(xvalue, leftnames, [], xlabel, "F1 Misprediction Rate", ""))
+    # leftnames = ['f2_hit_misp_rate']
+    # figs.append(draw_pecetage(xvalue, leftnames, [], xlabel, "F2 Misprediction Rate", ""))
 
-    leftnames = ['t_false_rate']
-    figs.append(draw_pecetage(xvalue, leftnames, [], xlabel, "T-False Rate", ""))
+    # leftnames = ['f1_hit_misp_rate']
+    # figs.append(draw_pecetage(xvalue, leftnames, [], xlabel, "F1 Misprediction Rate", ""))
 
-    figs.append(draw_lines(xvalue, ['f2_misp_MPKI'], [], xlabel, "F2 MPKI", ""))
-    figs.append(draw_lines(xvalue, ['f1_misp_MPKI'], [], xlabel, "F1 MPKI", ""))
+    # leftnames = ['t_false_rate']
+    # figs.append(draw_pecetage(xvalue, leftnames, [], xlabel, "T-False Rate", ""))
+
+    # figs.append(draw_lines(xvalue, ['f2_misp_MPKI'], [], xlabel, "F2 MPKI", ""))
+    # figs.append(draw_lines(xvalue, ['f1_misp_MPKI'], [], xlabel, "F1 MPKI", ""))
 
     # leftnames = ['dualbank_exe_misp_MPKI', 'singlebank_exe_misp_MPKI']
     # figs.append(draw_lines(xvalue, leftnames, [], xlabel, "MPKI", ""))
