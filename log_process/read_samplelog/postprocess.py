@@ -56,9 +56,24 @@ if __name__ == "__main__":
                     min_length = nonempty_count
 
     hash2config = {
-    'd63a7e6a7b8556f519bb0f482728c7018542622e':'base',
-    'dual':'dualbank',
-    'single' : 'singlebank'
+        # '6ef342b-M': 'base-16',
+        # '17f4d88-M': 'base-8',
+        # '7cb58ef-M': 'block-8-double',
+        # '3c32b65-M': 'base-16-double',
+        'c984e32-M': 'block-8-BIM',
+        'c984e32-L': 'block-16-BIM',
+        '5206270-M': 'block-8-TAGE',
+        '5206270-L': 'block-16-TAGE',
+        'b58a8db-M': 'block-8-TAGE-D',
+        'b58a8db-L': 'block-16-TAGE-D',
+        '5c23630-M': 'block-8-TAGE-Switch',
+        '5c23630-L': 'block-16-TAGE-Switch',
+        # '7478f2e-L': 'opt-16',
+        # '7478f2e-M': 'opt-8',
+        # 'f994918-M': 'base-16-br-dist',
+    # 'd63a7e6a7b8556f519bb0f482728c7018542622e':'base',
+    # 'dual':'dualbank',
+    # 'single' : 'singlebank'
     # 'b8cdcb02d0cb4efec580941a0a8a122c73ce3eee':'6-2048-9',
     # '9f8a97e32339da8ae24358b269b6072cdc438d9e':'6-1024-9',
     # '948eab349b4f1fd15eb4251997f276ead74779a1':'6-512-9',
@@ -76,18 +91,13 @@ if __name__ == "__main__":
     # '3ff5a552e15aba05d444ade657339caeb904d437':'6-128-7'
     }
 
-    whitelist=["exe_misp_MPKI","user_ipc" ,"tage_br_misp_rate" ,"tage_br_hit_rate" ,"tage_jalr_misp_rate" ,"tage_jalr_hit_rate" ,"tage_br_misp/hit"]
+    whitelist=["exe_misp_MPKI","user_ipc","com_misp_MPKI"]
     
-    fetch_buffer_percs = ['fetch_buffer_1_8_perc','fetch_buffer_2_8_perc','fetch_buffer_3_8_perc','fetch_buffer_4_8_perc','fetch_buffer_5_8_perc','fetch_buffer_6_8_perc','fetch_buffer_7_8_perc','fetch_buffer_8_8_perc']
-
-    whitelist.extend(fetch_buffer_percs)
-
-    whitelist.append("fetch_buffer_empty_rate")
     #open all the files in the input list, truncate the rows to the minimum length
     #skip all the rows with the first column not containing 'tage_br'
     #add a prefix to the first column to indicate the configuration
     #write the data to a file named by the benchmark name
-    with open(path_prefix+args.benchmark +'fetch_buffer_occupancy'+ '_post.csv', 'w', newline='') as f:
+    with open(path_prefix+args.benchmark +'BlockVSInst'+ '_post.csv', 'w', newline='') as f:
         writer = csv.writer(f)
         # write ,1,2,……,min_length to the first row
         header_row =[i for i in range(min_length)]
@@ -97,9 +107,10 @@ if __name__ == "__main__":
         for file in file_list: 
             # the input file is named as "bwaves-hash-cnt_eventinfo_h.csv"
             # get the hash part from the basename of the file
-            hash = os.path.basename(file).split('-')[1] 
+            hash = os.path.basename(file).split('-')[1] + '-' + os.path.basename(file).split('-')[2]
             # get the corresponding configuration
             if hash not in hash2config:
+                print("hash not found in hash2config: ", hash)
                 continue
             config = hash2config[hash]
             with open(file, 'r') as f1:
