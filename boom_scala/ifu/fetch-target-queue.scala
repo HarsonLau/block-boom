@@ -178,7 +178,7 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
     new_entry.cfi_npc_plus4 := io.enq.bits.cfi_npc_plus4
     new_entry.ras_top       := io.enq.bits.ras_top
     new_entry.ras_idx       := io.enq.bits.ghist.ras_idx
-    new_entry.br_mask       := io.enq.bits.br_mask & io.enq.bits.mask
+    new_entry.br_mask       := io.enq.bits.pd.brMask.asUInt & io.enq.bits.mask
     new_entry.start_bank    := bank(io.enq.bits.pc)
 
     //TODO: current_saw_branch_not_taken ?
