@@ -300,12 +300,12 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
     io.bpdupdate.bits.pc      := bpd_pc   // seems like the fetch bundle's PC
     io.bpdupdate.bits.btb_mispredicts := 0.U
     io.bpdupdate.bits.br_mask := Mux(bpd_entry.cfi_idx.valid,
-      MaskLower(UIntToOH(cfi_idx)) & bpd_pd.brMask, bpd_pd.brMask)
+      MaskLower(UIntToOH(cfi_idx)) & bpd_pd.brMask.asUInt, bpd_pd.brMask.asUInt)
     io.bpdupdate.bits.cfi_idx := bpd_entry.cfi_idx
     io.bpdupdate.bits.cfi_mispredicted := bpd_entry.cfi_mispredicted
     io.bpdupdate.bits.cfi_taken  := bpd_entry.cfi_taken
     io.bpdupdate.bits.target     := bpd_target
-    io.bpdupdate.bits.cfi_is_br  := bpd_pd.brMask(cfi_idx.bits)
+    io.bpdupdate.bits.cfi_is_br  := bpd_pd.brMask(bpd_entry.cfi_idx.bits)
     io.bpdupdate.bits.cfi_is_jal := bpd_entry.cfi_type === CFI_JAL || bpd_entry.cfi_type === CFI_JALR
     assert(!io.bpdupdate.bits.cfi_is_jal || !io.bpdupdate.bits.cfi_is_br, "JAL should not be a branch")
     io.bpdupdate.bits.cfi_is_jalr := bpd_entry.cfi_type === CFI_JALR
