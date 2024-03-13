@@ -298,6 +298,38 @@ def drawplot(resname):
     leftnames = ['block-16-TAGE_user_ipc', 'block-16-TAGE-Switch_user_ipc']
     figs.append(draw_lines(xvalue, leftnames, [], xlabel, "IPC", ""))
 
+        # 'ddbee18-M': 'block-8-TAGE-Fix',
+        # 'ddbee18-L': 'block-16-TAGE-Fix',
+        # '804474c-M': 'Base-8-TAGE',
+        # '804474c-L': 'Base-16-TAGE',
+    ## Fix vs not fix
+    ### 8 bytes
+    leftnames = ['block-8-TAGE_com_misp_MPKI', 'block-8-TAGE-Fix_com_misp_MPKI']
+    figs.append(draw_lines(xvalue, leftnames, [], xlabel, "Commit MPKI",""))
+    ### 16 bytes
+    leftnames = ['block-16-TAGE_com_misp_MPKI', 'block-16-TAGE-Fix_com_misp_MPKI']
+    figs.append(draw_lines(xvalue, leftnames, [], xlabel, "Commit MPKI",""))
+
+    ## Fix vs Base
+    leftnames = ['block-8-TAGE-Fix_com_misp_MPKI', 'Base-8-TAGE_com_misp_MPKI']
+    figs.append(draw_lines(xvalue, leftnames, [], xlabel, "Commit MPKI",""))
+    ### 16 bytes
+    leftnames = ['block-16-TAGE-Fix_com_misp_MPKI', 'Base-16-TAGE_com_misp_MPKI']
+    figs.append(draw_lines(xvalue, leftnames, [], xlabel, "Commit MPKI",""))
+
+    ## not fix vs Base
+    leftnames = ['block-8-TAGE_com_misp_MPKI', 'Base-8-TAGE_com_misp_MPKI']
+    figs.append(draw_lines(xvalue, leftnames, [], xlabel, "Commit MPKI",""))
+    #### IPC
+    leftnames = ['block-8-TAGE_user_ipc', 'Base-8-TAGE_user_ipc']
+    figs.append(draw_lines(xvalue, leftnames, [], xlabel, "IPC",""))
+    ### 16 bytes
+    leftnames = ['block-16-TAGE_com_misp_MPKI', 'Base-16-TAGE_com_misp_MPKI']
+    figs.append(draw_lines(xvalue, leftnames, [], xlabel, "Commit MPKI",""))
+    #### IPC
+    leftnames = ['block-16-TAGE_user_ipc', 'Base-16-TAGE_user_ipc']
+    figs.append(draw_lines(xvalue, leftnames, [], xlabel, "IPC",""))
+
     pp = PdfPages(resname)
     idx = 0
     for fig in figs:
