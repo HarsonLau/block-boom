@@ -317,6 +317,9 @@ def drawplot(resname):
     leftnames = ['block-16-TAGE-Fix_com_misp_MPKI', 'Base-16-TAGE_com_misp_MPKI']
     figs.append(draw_lines(xvalue, leftnames, [], xlabel, "Commit MPKI",""))
 
+    leftnames = ['Base-8-TAGE_com_misp_MPKI', 'Base-16-TAGE_com_misp_MPKI']
+    figs.append(draw_lines(xvalue, leftnames, [], xlabel, "Commit MPKI",""))
+
     ## not fix vs Base
     leftnames = ['block-8-TAGE_com_misp_MPKI', 'Base-8-TAGE_com_misp_MPKI']
     figs.append(draw_lines(xvalue, leftnames, [], xlabel, "Commit MPKI",""))
