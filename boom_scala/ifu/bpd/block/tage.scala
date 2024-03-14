@@ -126,7 +126,7 @@ class BlockTage(params: BlockTageParams = BlockTageParams())(implicit p: Paramet
     f3_meta.allocate(w).bits  := alloc_entry
 
     val s1_slot_offset = s1_update.bits.ftb_entry.getOffsetVec(w)
-    val s1_slot_mispredicted = s1_update.bits.cfi_idx.valid && (s1_update.bits.cfi_idx.bits === s1_slot_offset) && s1_update.bits.cfi_mispredicted && s1_update.bits.ftb_entry.slot_valids(w)
+    val s1_slot_mispredicted = s1_update.bits.cfi_idx.valid && (s1_update.bits.cfi_idx.bits === s1_slot_offset) && s1_update.bits.cfi_mispredicted
     val update_was_taken = (s1_update.bits.cfi_idx.valid &&
                             (s1_update.bits.cfi_idx.bits === s1_slot_offset) &&
                             s1_update.bits.cfi_taken)
