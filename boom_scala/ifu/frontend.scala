@@ -523,7 +523,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   //   false.B)
   
   val n_f1_predicted_ghist = s1_ghist.update(
-    n_s1_bpd_resp.pred.brMask.asUInt & f1_mask.asUInt, // branches
+    n_s1_bpd_resp.pred.br_mask.asUInt & f1_mask.asUInt, // branches
     n_s1_bpd_resp.pred.real_slot_taken() && n_f1_do_redirect, // cfi_taken
     n_s1_bpd_resp.pred.hit_taken_on_br, //cfi_is_br
     n_f1_redirect_idx, // cfi_idx
@@ -533,7 +533,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     false.B) // cfi_is_ret
 
   if(enableWatchPC){
-    val f1_ghist_branches = n_s1_bpd_resp.pred.brMask.asUInt & f1_mask.asUInt
+    val f1_ghist_branches = n_s1_bpd_resp.pred.br_mask.asUInt & f1_mask.asUInt
     val f1_ghist_cfi_taken = n_s1_bpd_resp.pred.real_slot_taken() && n_f1_do_redirect
     val f1_ghist_cfi_is_br = n_s1_bpd_resp.pred.hit_taken_on_br
     val f1_ghist_cfi_idx = n_f1_redirect_idx
@@ -626,7 +626,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   //   false.B,
   //   false.B)
   val n_f2_predicted_ghist = s2_ghist.update(
-    n_f2_bpd_resp.pred.brMask.asUInt & f2_mask.asUInt, // branches
+    n_f2_bpd_resp.pred.br_mask.asUInt & f2_mask.asUInt, // branches
     n_f2_bpd_resp.pred.real_slot_taken() && n_f2_do_redirect, // cfi_taken
     n_f2_bpd_resp.pred.hit_taken_on_br, // cfi_is_br
     n_f2_redirect_idx, // cfi_idx
@@ -636,7 +636,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     false.B) // cfi_is_ret
 
   if(enableWatchPC){
-    val f2_ghist_branches = n_f2_bpd_resp.pred.brMask.asUInt & f2_mask.asUInt
+    val f2_ghist_branches = n_f2_bpd_resp.pred.br_mask.asUInt & f2_mask.asUInt
     val f2_ghist_cfi_taken = n_f2_bpd_resp.pred.real_slot_taken() && n_f2_do_redirect
     val f2_ghist_cfi_is_br = n_f2_bpd_resp.pred.hit_taken_on_br
     val f2_ghist_cfi_idx = n_f2_redirect_idx

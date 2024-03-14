@@ -62,6 +62,7 @@ class BlockPrediction(implicit p: Parameters) extends BoomBundle()(p)
 with HasBoomFTBParameters
 {
   val br_taken_mask = Vec(numBr, Bool())
+  val br_mask = Vec(predictWidth, Bool())
 
   val slot_valids = Vec(totalSlot, Bool())
 
@@ -220,9 +221,9 @@ with HasBoomFTBParameters
 
   def taken = br_taken_mask.reduce(_||_) || slot_valids.last // || (is_jal || is_jalr)
 
-  def brMask: UInt = {
-    (br_valids zip offsets).map{ case (t, o) => (t << o)}.reduce(_|_).asUInt()
-  }
+  // def brMask: UInt = {
+  //   (br_valids zip offsets).map{ case (t, o) => (t << o)}.reduce(_|_).asUInt()
+  // }
 
 
 
@@ -242,6 +243,7 @@ with HasBoomFTBParameters
     is_ret := entry.tailSlot.valid && entry.isRet
     last_may_be_rvi_call := entry.last_may_be_rvi_call
     is_br_sharing := entry.tailSlot.valid && entry.tailSlot.sharing
+    br_mask := entry.br_mask
     // predCycle.map(_ := GTimer())
 
     // fallThroughAddr := Mux(fallThroughErr, pc + (predictWidth * 2).U, entry.getFallThrough(pc, last_stage_entry))
@@ -278,6 +280,7 @@ with HasBoomFTBParameters
     // fallThroughErr := false.B
     hit := false.B
     blockMask := VecInit(Seq.fill(predictWidth)(true.B))
+    br_mask := VecInit(Seq.fill(predictWidth)(false.B))
   }
 
   def display(cond: Bool): Unit = {

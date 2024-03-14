@@ -142,6 +142,8 @@ class FTBEntry(implicit p: Parameters) extends BoomBundle with FTBParams with BP
 
   val always_taken = Vec(numBr, Bool())
 
+  val br_mask      = Vec(predictWidth, Bool())
+
   def getSlotForBr(idx: Int): FtbSlot = {
     require(idx <= numBr-1)
     (idx, numBr) match {

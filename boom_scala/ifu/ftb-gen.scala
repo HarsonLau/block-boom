@@ -110,6 +110,7 @@ class FTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBPara
   init_entry.isRet  := new_jmp_is_ret
   // that means fall thru points to the middle of an inst
   init_entry.last_may_be_rvi_call := last_jmp_rvi
+  init_entry.br_mask := pd.brMask
 
   // if hit, check whether a new cfi(only br is possible) is detected
   val oe = io.old_entry
@@ -171,6 +172,7 @@ class FTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBPara
     old_entry_modified.isCall := false.B
     old_entry_modified.isRet := false.B
     old_entry_modified.isJalr := false.B
+    old_entry_modified.br_mask := pd.brMask
   }
 
   val old_entry_jmp_target_modified = WireInit(oe)
@@ -180,6 +182,7 @@ class FTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBPara
   when (jalr_target_modified) {
     old_entry_jmp_target_modified.setByJmpTarget(io.start_addr, io.target)
     old_entry_jmp_target_modified.always_taken := 0.U.asTypeOf(Vec(numBr, Bool()))
+    old_entry_jmp_target_modified.br_mask := pd.brMask
   }
 
   val old_entry_always_taken = WireInit(oe)
