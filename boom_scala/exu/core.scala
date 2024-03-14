@@ -602,8 +602,8 @@ class BoomCore(usingTrace: Boolean)(implicit p: Parameters) extends BoomModule
     event_counters.io.event_signals(35) := RegNext(PopCount(valid_masks & br_masks & fauftb_hit_masks))//br fauftb hit
     event_counters.io.event_signals(36) := RegNext(PopCount(valid_masks & br_masks & fauftb_hit_masks & (fauftb_taken_masks ^ taken_masks)))//br fauftb misp
     
-    event_counters.io.event_signals(37) :=  RegNext(PopCount(valid_masks & br_masks & ftb_hit_masks & (bim_taken_masks ^ taken_masks) & taken_masks))// br taken predict not taken
-    event_counters.io.event_signals(38) :=  RegNext(PopCount(valid_masks & br_masks & ftb_hit_masks & (bim_taken_masks ^ taken_masks) & (~taken_masks)))// br not taken predict taken
+    event_counters.io.event_signals(37) :=  RegNext(PopCount(valid_masks & br_masks & ftb_hit_masks & (tage_taken_masks ^ taken_masks) & taken_masks))// br taken predict not taken
+    event_counters.io.event_signals(38) :=  RegNext(PopCount(valid_masks & br_masks & ftb_hit_masks & (tage_taken_masks ^ taken_masks) & (~taken_masks)))// br not taken predict taken
     // event_counters.io.event_signals(38) :=  Mux(io.lsu.perf.acquire, 1.U, 0.U) //dcache send req to next level number
 
     event_counters.io.event_signals(39) :=  PopCount(exe_is_br.asUInt)       //execute br number
