@@ -1096,16 +1096,16 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
 
   f3_fetch_bundle.next_pc       := f3_predicted_target
   val f3_predicted_ghist = f3_fetch_bundle.ghist.update(
-    n_f3_bpd_resp.io.deq.bits.pred.brMask.asUInt & f3_mask.asUInt, // branches
+    f3_br_mask.asUInt & f3_mask.asUInt, // branches
     f3_fetch_bundle.cfi_idx.valid, // cfi_taken
-    f3_fetch_bundle.br_mask(f3_fetch_bundle.cfi_idx.bits), // cfi_is_br
+    f3_br_mask(f3_fetch_bundle.cfi_idx.bits), // cfi_is_br
     f3_fetch_bundle.cfi_idx.bits, // cfi_idx
     f3_fetch_bundle.cfi_idx.valid, // cfi_valid
     f3_fetch_bundle.pc, // addr
     f3_fetch_bundle.cfi_is_call, // cfi_is_call
     f3_fetch_bundle.cfi_is_ret // cfi_is_ret
   )
-  f3_fetch_bundle.br_mask := n_f3_bpd_resp.io.deq.bits.pred.brMask.asUInt & f3_mask.asUInt // branches
+  f3_fetch_bundle.br_mask := f3_br_mask.asUInt & f3_mask.asUInt // branches
 
   if(enableWatchPC){
     val cond = f3_fetch_bundle.pc === watchPC.asUInt
