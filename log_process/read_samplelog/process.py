@@ -17,6 +17,10 @@ def process_infos(startinfo, eventinfos):
   
     eventinfos.append(cal_fraction((eventinfos[43] + eventinfos[44]) * 1000, eventinfos[1], "exe_misp_MPKI"))
     eventinfos.append(cal_fraction((eventinfos[53] + eventinfos[54]) * 1000, eventinfos[1], "com_misp_MPKI"))
+    eventinfos.append(cal_fraction((eventinfos[53]) * 1000, eventinfos[1], "com_br_MPKI"))
+    eventinfos.append(cal_fraction((eventinfos[54]) * 1000, eventinfos[1], "com_jalr_MPKI"))
+    eventinfos.append(cal_fraction((eventinfos[55]) * 1000, eventinfos[1], "com_ret_MPKI"))
+    eventinfos.append(cal_fraction((eventinfos[56]) * 1000, eventinfos[1], "com_call_MPKI"))
 
     eventinfos.append(cal_fraction(eventinfos[1], eventinfos[0], "user_ipc"))
     # eventinfos.append(cal_fraction(eventinfos[31],eventinfos[32],"f3_hit_misp_rate"))

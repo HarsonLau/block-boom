@@ -247,6 +247,9 @@ def drawplot(resname):
     leftnames = ['com_misp_MPKI']
     figs.append(draw_lines(xvalue, leftnames, [], xlabel, "MPKI", ""))
 
+    leftnames = ['com_br_MPKI', 'com_jalr_MPKI', 'com_ret_MPKI', 'com_call_MPKI']
+    figs.append(draw_lines(xvalue, leftnames, [], xlabel, "MPKI", ""))
+
     # leftnames = ['fetch_buffer_1_8_perc','fetch_buffer_2_8_perc','fetch_buffer_3_8_perc','fetch_buffer_4_8_perc','fetch_buffer_5_8_perc','fetch_buffer_6_8_perc','fetch_buffer_7_8_perc','fetch_buffer_8_8_perc']
     # figs.append(draw_pecetage(xvalue, leftnames, [], xlabel, "Fetch Buffer Occupancy", ""))
 
