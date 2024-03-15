@@ -18,6 +18,7 @@ trait FTBParams extends HasBoomFTBParameters {
   val numWays    = 4
   val numSets    = numEntries/numWays // 256
   val tagSize    = 20
+  val extendedNSets = 128
 
 
 
@@ -138,7 +139,7 @@ class FTBEntry(implicit p: Parameters) extends BoomBundle with FTBParams with BP
   val isRet       = Bool()
   val isJalr      = Bool()
 
-  val last_may_be_rvi_call = Bool()
+  val needExtend = Bool()
 
   val always_taken = Vec(numBr, Bool())
 
@@ -244,7 +245,7 @@ class FTBEntry(implicit p: Parameters) extends BoomBundle with FTBParams with BP
     } else {
       XSDebug(cond,prefix+ p"pftAddr: ${Hexadecimal(pftAddr)}, carry: $carry\n")
     }
-    XSDebug(cond,prefix+ p"isCall: $isCall isRet: $isRet isjalr: $isJalr last_may_be_rvi_call: $last_may_be_rvi_call\n")
+    XSDebug(cond,prefix+ p"isCall: $isCall isRet: $isRet isjalr: $isJalr\n")
     if(decimal){
       XSDebug(cond,prefix+ p"always_taken: ${always_taken.asUInt}\n")
     }
@@ -310,16 +311,18 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   val tag = Seq.fill(nWays) {SyncReadMem(nSets, UInt(tagSize.W))}
   val ftb = Seq.fill(nWays) {SyncReadMem(nSets, new FTBEntry)}
 
+  val ebtb     = SyncReadMem(extendedNSets, UInt(vaddrBitsExtended.W))
   //TODO: val mems = ...
 
   val mems = (((0 until nWays) map ({w:Int => Seq(
     (f"ftb_tag_way$w", nSets, tagSize),
-    (f"ftb_data_way$w", nSets, ftbEntrySz))})).flatten)
+    (f"ftb_data_way$w", nSets, ftbEntrySz))})).flatten++ Seq(("ebtb", extendedNSets, vaddrBitsExtended)))
 
   val r_s0_idx = ftbAddr.getIdx(s0_pc)
   val s0_tag = ftbAddr.getTag(s0_pc)
   val s1_req_rftb = VecInit(ftb.map(_.read(r_s0_idx, s0_valid)).map(_.asTypeOf(new FTBEntry)))
   val s1_req_rtag = VecInit(tag.map(_.read(r_s0_idx, s0_valid)))
+  val s1_req_rebtb = ebtb.read(s0_idx, s0_valid)
   val s1_req_tag = RegNext(s0_tag)
 
   val s1_hit_ohs = VecInit( (0 until nWays) map { i =>
@@ -349,10 +352,14 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   s1_meta.writeWay := Mux(s1_hit, s1_hit_way, alloc_way)
 
   io.resp.f2 := io.resp_in(0).f2
+  io.resp.f2.jalr_target.bits := RegNext(s1_req_rebtb)
   io.resp.f3 := io.resp_in(0).f3
+  io.resp.f3.jalr_target.bits := RegNext(RegNext(s1_req_rebtb))
   when(RegNext(s1_hit && !s1_hit_fallthrough_error)) {
     io.resp.f2.fromFtbEntry(RegNext(s1_ftb_entry), RegNext(s1_pc))
     io.resp.f2.hit := true.B
+    io.resp.f2.jalr_target.valid := RegNext(s1_ftb_entry.needExtend)
+    io.resp.f3.jalr_target.valid := RegNext(RegNext(s1_ftb_entry.needExtend))
     for (i <- 0 until numBr) {
       io.resp.f2.perfs(i).ftb_hit := true.B
       when(RegNext(s1_ftb_entry.always_taken(i))) {
@@ -434,6 +441,7 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
     
   // s1
   val u_s1_pc = RegNext(u.bits.pc)
+  val u_s1_target = RegNext(u.bits.target)
   val u_s1_meta = RegNext(u_meta)
   val u_s1_valid = RegNext(u.valid)
   val u_s1_commit_valid = RegNext(u.valid && !u.bits.is_btb_mispredict_update)
@@ -441,6 +449,8 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   val u_s1_idx = RegNext(u_s0_idx)
   val u_s1_ftb_entry = RegEnable(u.bits.ftb_entry, u.valid)
   val u_s1_ftb_entry_empty = !u_s1_ftb_entry.valid || !u_s1_ftb_entry.hasValidSlot // if the entry is invalid or contains no valid slot
+
+  val u_s1_need_extend = u_s1_commit_valid && !u_s1_ftb_entry_empty && u_s1_ftb_entry.isJalr && u_s1_ftb_entry.needExtend
 
   if(enableFTBJsonInsertPrint){
     // val cond = u.valid && u.bits.ftb_entry.valid && u.bits.ftb_entry.hasValidSlot
@@ -471,6 +481,9 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
         Mux(doing_reset, 0.U.asTypeOf(UInt(tagSize.W)), u_s1_tag)
       )
     }
+  }
+  when(u_s1_need_extend){
+    ebtb.write(u_s1_idx, u_s1_target)
   }
 
 }

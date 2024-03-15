@@ -76,7 +76,6 @@ with HasBoomFTBParameters
   val is_jalr = Bool()
   val is_call = Bool()
   val is_ret = Bool()
-  val last_may_be_rvi_call = Bool()
   val is_br_sharing = Bool()
 
   // val call_is_rvc = Bool()
@@ -234,15 +233,16 @@ with HasBoomFTBParameters
                     last_stage_entry: Option[Tuple2[FTBEntry, Bool]] = None
                   ) = {
     slot_valids := entry.brSlots.map(_.valid) :+ entry.tailSlot.valid
-    targets := entry.getTargetVec(pc, last_stage_pc) // Use previous stage pc for better timing
-    jalr_target := 0.U.asTypeOf(Valid(UInt(vaddrBitsExtended.W)))
+    targets := entry.getTargetVec(pc, last_stage_pc)
+    // targets := Mux(jalr_target.valid, entry.getTargetVec(pc, last_stage_pc).init :+ jalr_target.bits , ftb_targets)
+    
+    jalr_target := DontCare
     // jalr_target := targets.last
     offsets := entry.getOffsetVec
     is_jal := entry.tailSlot.valid && entry.isJal
     is_jalr := entry.tailSlot.valid && entry.isJalr
     is_call := entry.tailSlot.valid && entry.isCall
     is_ret := entry.tailSlot.valid && entry.isRet
-    last_may_be_rvi_call := entry.last_may_be_rvi_call
     is_br_sharing := entry.tailSlot.valid && entry.tailSlot.sharing
     br_mask := entry.br_mask
     // predCycle.map(_ := GTimer())
@@ -275,7 +275,6 @@ with HasBoomFTBParameters
     is_jalr := false.B
     is_call := false.B
     is_ret := false.B
-    last_may_be_rvi_call := false.B
     is_br_sharing := false.B
     // predCycle.map(_ := 0.U)
 
@@ -293,7 +292,7 @@ with HasBoomFTBParameters
       XSDebug(cond, p"slot $i: valid:${slot_valids(i)} target:0x${Hexadecimal(targets(i))} offset:${offsets(i)}\n")
     }
     XSDebug(cond, p"fallThroughAddr: ${Hexadecimal(fallThroughAddr)}\n")
-    XSDebug(cond, p"is_jal: $is_jal is_jalr: $is_jalr is_call: $is_call is_ret: $is_ret last_may_be_rvi_call: $last_may_be_rvi_call is_br_sharing: $is_br_sharing\n")
+    XSDebug(cond, p"is_jal: $is_jal is_jalr: $is_jalr is_call: $is_call is_ret: $is_ret is_br_sharing: $is_br_sharing\n")
     XSDebug(cond, "---------------------\n")
   }
 }
