@@ -67,7 +67,7 @@ with HasBoomFTBParameters
   val slot_valids = Vec(totalSlot, Bool())
 
   val targets = Vec(totalSlot, UInt(vaddrBitsExtended.W))
-  //val jalr_target = UInt(vaddrBitsExtended.W) // special path for indirect predictors
+  val jalr_target = Valid(UInt(vaddrBitsExtended.W)) // special path for indirect predictors
   val offsets = Vec(totalSlot, UInt(log2Ceil(predictWidth).W))
   val fallThroughAddr = UInt(vaddrBitsExtended.W)
   // val fallThroughErr = Bool()
@@ -235,6 +235,7 @@ with HasBoomFTBParameters
                   ) = {
     slot_valids := entry.brSlots.map(_.valid) :+ entry.tailSlot.valid
     targets := entry.getTargetVec(pc, last_stage_pc) // Use previous stage pc for better timing
+    jalr_target := 0.U.asTypeOf(Valid(UInt(vaddrBitsExtended.W)))
     // jalr_target := targets.last
     offsets := entry.getOffsetVec
     is_jal := entry.tailSlot.valid && entry.isJal
@@ -264,6 +265,7 @@ with HasBoomFTBParameters
     br_taken_mask := VecInit(Seq.fill(numBr)(false.B))
     slot_valids := VecInit(Seq.fill(totalSlot)(false.B))
     targets := VecInit(Seq.fill(totalSlot)(0.U))
+    jalr_target := 0.U.asTypeOf(Valid(UInt(vaddrBitsExtended.W)))
     // jalr_target := 0.U
     offsets := VecInit(Seq.fill(totalSlot)(0.U))
     fallThroughAddr := nextFetch(pc)
@@ -326,6 +328,7 @@ class BPBankUpdate(implicit p: Parameters) extends BoomBundle()(p)
   val cfi_is_br        = Bool()
   val cfi_is_jal       = Bool()
   val cfi_is_jalr      = Bool()
+  val cfi_is_ret       = Bool()
 
   val ghist            = UInt(globalHistoryLength.W)
   val lhist            = UInt(localHistoryLength.W)
@@ -387,6 +390,7 @@ class BlockUpdate(implicit p: Parameters) extends BoomBundle()(p)
   val cfi_is_br        = Bool()
   val cfi_is_jal       = Bool()
   val cfi_is_jalr      = Bool()
+  val cfi_is_ret       = Bool()
 
   val ghist            = new GlobalHistory
   val lhist            = UInt(localHistoryLength.W)
@@ -422,45 +426,6 @@ class BlockUpdate(implicit p: Parameters) extends BoomBundle()(p)
 
 }
 
-class BlockUpdateInfo(implicit p: Parameters) extends BoomBundle()(p)
-  with HasBoomFTBParameters
-{
-  val is_mispredict_update     = Bool()  // TODO: do we need this?
-  val is_repair_update         = Bool()  // TODO: do we need this?
-
-  val btb_mispredicts  = UInt(fetchWidth.W)
-  def is_btb_mispredict_update = btb_mispredicts =/= 0.U
-
-  def is_commit_update = !(is_mispredict_update || is_repair_update || is_btb_mispredict_update)
-
-  val pc               = UInt(vaddrBitsExtended.W)
-
-  val br_mask          = UInt(fetchWidth.W)
-  val cfi_idx          = Valid(UInt(log2Ceil(fetchWidth).W))
-  val cfi_taken        = Bool()
-  val cfi_mispredicted = Bool()
-
-  // val cfi_is_br        = Bool()
-  // val cfi_is_jal       = Bool()
-  // val cfi_is_jalr      = Bool()
-
-  val ghist            = new GlobalHistory
-  val lhist            = UInt(localHistoryLength.W)
-
-  val target           = UInt(vaddrBitsExtended.W)
-
-  val meta             = UInt(bpdMaxMetaLength.W)
-
-  val pd = new PredecodeBundle
-
-  val ftb_entry = new FTBEntry
-  val br_taken_mask = Vec(numBr, Bool())
-}
-// class BlockBranchPredictionRequest(implicit p: Parameters) extends BoomBundle()(p)
-// {
-//   val pc    = UInt(vaddrBitsExtended.W)
-//   val ghist = new GlobalHistory
-// }
 
 class BPBankResponse(implicit p: Parameters) extends BoomBundle()(p)
   with HasBoomFTBParameters
@@ -629,6 +594,7 @@ class BlockPredictor(implicit p:Parameters) extends BoomModule()(p)
   predictors.io.update.bits.cfi_is_br := io.update.bits.cfi_is_br
   predictors.io.update.bits.cfi_is_jal := io.update.bits.cfi_is_jal
   predictors.io.update.bits.cfi_is_jalr := io.update.bits.cfi_is_jalr
+  predictors.io.update.bits.cfi_is_ret := io.update.bits.cfi_is_ret
   predictors.io.update.bits.target := io.update.bits.target
 
   lhist_providers.io.update.mispredict := io.update.bits.is_mispredict_update

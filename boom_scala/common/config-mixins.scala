@@ -454,7 +454,7 @@ class WithTAGELBPD extends Config((site, here, up) => {
 class WithBlockBPD extends Config((site, here, up) => {
   case TilesLocated(InSubsystem) => up(TilesLocated(InSubsystem), site) map {
     case tp: BoomTileAttachParams => tp.copy(tileParams = tp.tileParams.copy(core = tp.tileParams.core.copy(
-      bpdMaxMetaLength = 120,
+      bpdMaxMetaLength = 240,
       globalHistoryLength = 64,
       localHistoryLength = 1,
       localHistoryNSets = 0,
@@ -463,15 +463,17 @@ class WithBlockBPD extends Config((site, here, up) => {
         val ftb = Module(new FTB()(p))
         val bim = Module(new BlockBIM()(p))
         val tage = Module(new BlockTage()(p))
-        val preds = Seq(fauftb, ftb, bim, tage)
+        val ittage = Module(new IttageBank()(p))
+        val preds = Seq(fauftb, ftb, bim, tage, ittage)
         preds.map(_.io := DontCare)
 
         fauftb.io.resp_in(0)  := resp_in
         bim.io.resp_in(0)  := fauftb.io.resp
         ftb.io.resp_in(0)   := bim.io.resp
         tage.io.resp_in(0)  := ftb.io.resp
+        ittage.io.resp_in(0) := tage.io.resp
         
-        (preds, tage.io.resp)
+        (preds, ittage.io.resp)
       })
     )))
     case other => other

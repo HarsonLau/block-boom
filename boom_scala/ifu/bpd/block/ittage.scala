@@ -209,7 +209,7 @@ case class BoomIttageParams(
 )
 
 
-class IttageBranchPredictorBank(params: BoomIttageParams = BoomIttageParams())(implicit p: Parameters) extends BranchPredictorBank()(p)
+class IttageBank(params: BoomIttageParams = BoomIttageParams())(implicit p: Parameters) extends BlockPredictorBank()(p)
 {
   val ittageUBitPeriod = params.uBitPeriod
   val ittageNTables    = params.tableInfo.size
@@ -241,7 +241,7 @@ class IttageBranchPredictorBank(params: BoomIttageParams = BoomIttageParams())(i
     case (n, l, s) => {
       val t = Module(new IttageTable(n, s, l, params.uBitPeriod))
       t.io.f1_req_valid := RegNext(io.f0_valid)
-      t.io.f1_req_pc    := RegNext(io.f0_pc + io.f0_pc_bankOffset)
+      t.io.f1_req_pc    := RegNext(io.f0_pc)
       t.io.f1_req_ghist := io.f1_ghist
       (t, t.mems)
     }
@@ -267,9 +267,9 @@ class IttageBranchPredictorBank(params: BoomIttageParams = BoomIttageParams())(i
   s1_update_u       := DontCare
   s1_update_old_target := DontCare
 
-  for (w <- 0 until bankWidth) {
-    io.resp.f3(w).taken := io.resp_in(0).f3(w).taken
-  }
+  // for (w <- 0 until bankWidth) {
+  //   io.resp.f3(w).taken := io.resp_in(0).f3(w).taken
+  // }
 
   // mgy for debug
   val cycle_cnt = RegInit(0.U(64.W))
@@ -302,8 +302,8 @@ class IttageBranchPredictorBank(params: BoomIttageParams = BoomIttageParams())(i
     provider_target     = Mux(hit, target, provider_target)
   }
 
-  io.predicted_pc_ittage.valid  := provided
-  io.predicted_pc_ittage.bits   := Mux(provider_ctr === 0.U && altProvided, altProvider_target, provider_target)
+  io.resp.f3.jalr_target.valid  := provided
+  io.resp.f3.jalr_target.bits   := Mux(provider_ctr === 0.U && altProvided, altProvider_target, provider_target)
   // printf("cycle: 0x%x, provider_ctr: 0x%x, provided: 0x%x, altProvider_target: 0x%x, provider_target: 0x%x, io.predicted_pc_ittage.valid: 0b%b, io.predicted_pc_ittage.bits: 0x%x\n",
   //   cycle_cnt, provider_ctr, provided, altProvider_target, provider_target, io.predicted_pc_ittage.valid, io.predicted_pc_ittage.bits)
 
@@ -370,11 +370,11 @@ class IttageBranchPredictorBank(params: BoomIttageParams = BoomIttageParams())(i
       s1_update_alloc(allocate.bits) := true.B
       s1_update_u_mask(allocate.bits) := true.B
       s1_update_u     (allocate.bits) := 0.U
-      printf("allocate TableN: %x\n", allocate.bits)
+      // printf("allocate TableN: %x\n", allocate.bits)
     } .otherwise {
       val provider = s1_update_meta.provider
       val decr_mask = Mux(provider.valid, ~MaskLower(UIntToOH(provider.bits)), 0.U)
-      printf("Clear table mask: 0b%b\n", decr_mask)
+      // printf("Clear table mask: 0b%b\n", decr_mask)
       for (i <- 0 until ittageNTables) {
         when (decr_mask(i)) {
           s1_update_u_mask(i) := true.B
@@ -394,16 +394,11 @@ class IttageBranchPredictorBank(params: BoomIttageParams = BoomIttageParams())(i
     tables(i).io.update_u_mask     := RegNext(s1_update_u_mask(i))
     tables(i).io.update_u          := RegNext(s1_update_u(i))
     tables(i).io.update_old_target := RegNext(s1_update_old_target(i))
-    tables(i).io.update_pc    := RegNext(s1_update.bits.pc + s1_update.bits.pc_bankOffset)
+    tables(i).io.update_pc    := RegNext(s1_update.bits.pc)
     tables(i).io.update_hist  := RegNext(s1_update.bits.ghist)
     tables(i).io.update_target:= RegNext(s1_update.bits.target)
-    when(tables(i).io.update_mask === true.B){
-      printf("cycle: 0x%x, table %d -> update_m: %d, misp_m: %d, update_alloc: %d, update_old_ctr: %d, update_u_m: %d, update_u: %d, update_pc: 0x%x, update_hist: 0x%x, update_target: 0x%x, update_old_target: 0x%x, bankOffset: 0x%x\n",
-       cycle_cnt, i.U, tables(i).io.update_mask, tables(i).io.update_mispredict, tables(i).io.update_alloc, tables(i).io.update_old_ctr, tables(i).io.update_u_mask, tables(i).io.update_u, 
-       tables(i).io.update_pc, tables(i).io.update_hist, tables(i).io.update_target, tables(i).io.update_old_target, RegNext(s1_update.bits.pc_bankOffset))        
-    }
   }
 
   //io.f3_meta := Cat(f3_meta.asUInt, micro.io.f3_meta(micro.metaSz-1,0), base.io.f3_meta(base.metaSz-1, 0))
-  io.f3_meta := f3_meta.asUInt
+  io.resp.f3_meta := f3_meta.asUInt
 }

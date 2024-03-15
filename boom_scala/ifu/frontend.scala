@@ -935,9 +935,10 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
       // bank_mask(w) := f3.io.deq.valid && f3_imemresp.mask(i) && valid && !redirect_found
       // f3_mask  (i) := f3.io.deq.valid && f3_imemresp.mask(i) && valid && !redirect_found
       val bpd_predicted_target = n_f3_bpd_resp.io.deq.bits.pred.getTarget(i.asUInt, n_f3_bpd_resp.io.deq.bits.pc) // FTB
+      val bpd_predicted_jalr_target = n_f3_bpd_resp.io.deq.bits.pred.jalr_target
       assert(bpd_predicted_target =/= 0.U, "bpd_predicted_target is 0\n")
       f3_targs (i) := Mux(brsigs.cfi_type === CFI_JALR,
-        Mux(f3_recorded_cfi_mask(i), bpd_predicted_target, nextFetch(f3_imemresp.pc)), // TODO: fixme for unrecorded JALR
+        Mux(bpd_predicted_jalr_target.valid, bpd_predicted_jalr_target.bits, nextFetch(f3_imemresp.pc)), // TODO: fixme for unrecorded JALR
         brsigs.target)
 
       val jalTargetMispredicted = (

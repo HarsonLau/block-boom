@@ -546,6 +546,30 @@ class BoomCore(usingTrace: Boolean)(implicit p: Parameters) extends BoomModule
     event_counters.io.event_signals(w) := 0.U
   }
 
+
+  val debug_cycle = RegInit(0.U(64.W))
+  debug_cycle := debug_cycle + 1.U
+  val debug_commit_inst = RegInit(0.U(64.W))
+  val debug_commit_br = RegInit(0.U(64.W))
+  val debug_exe_misp_br = RegInit(0.U(64.W))
+  val debug_commit_misp_br = RegInit(0.U(64.W))
+  val debug_commit_misp_jalr = RegInit(0.U(64.W))
+  when(debug_cycle % 50000.U === 0.U){
+    // print the above counters in json format
+    printf("{\"cycle\": %d, \"commit_inst\": %d, \"commit_misp_jalr\": %d, \"commit_br\": %d, \"exe_misp_br\": %d, \"commit_misp_br\": %d}\n", RegNext(debug_cycle), RegNext(debug_commit_inst), RegNext(debug_commit_misp_jalr), RegNext(debug_commit_br), RegNext(debug_exe_misp_br), RegNext(debug_commit_misp_br))
+    debug_commit_inst := 0.U
+    debug_commit_br := 0.U
+    debug_exe_misp_br := 0.U
+    debug_commit_misp_br := 0.U
+    debug_commit_misp_jalr := 0.U
+  }.otherwise{
+    debug_commit_inst := debug_commit_inst + RegNext(PopCount(rob.io.commit.arch_valids.asUInt))
+    debug_exe_misp_br := debug_exe_misp_br + Mux(exe_misp_br, 1.U, 0.U)
+    debug_commit_br := debug_commit_br + PopCount(com_is_br.asUInt)
+    debug_commit_misp_br := debug_commit_misp_br + PopCount(com_misp_br.asUInt)
+    debug_commit_misp_jalr := debug_commit_misp_jalr + PopCount(com_misp_jalr.asUInt)
+  }
+
   when (startCounter) {
     event_counters.io.event_signals(0) :=   1.U  //cycles
     event_counters.io.event_signals(1) :=  RegNext(PopCount(rob.io.commit.arch_valids.asUInt)) // commit inst

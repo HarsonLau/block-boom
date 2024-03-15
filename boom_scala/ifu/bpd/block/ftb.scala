@@ -27,7 +27,7 @@ trait FTBParams extends HasBoomFTBParameters {
   def TAR_UDF = 2.U(TAR_STAT_SZ.W)
 
   def BR_OFFSET_LEN = 12
-  def JMP_OFFSET_LEN = 35
+  def JMP_OFFSET_LEN = 20
 }  
 
 
