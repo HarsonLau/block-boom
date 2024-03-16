@@ -505,6 +505,7 @@ class BoomCore(usingTrace: Boolean)(implicit p: Parameters) extends BoomModule
   val com_misp_jalrcall  = Wire(Vec(coreWidth, Bool()))
   val com_misp_cfi  = Wire(Vec(coreWidth, Bool()))
   val com_misp_br_ftbhit = Wire(Vec(coreWidth, Bool()))
+  val com_pc_in_ckpt = Wire(Vec(coreWidth, Bool()))
 
   for(w <- 0 until coreWidth) {
     val uop = rob.io.commit.uops(w)
@@ -521,6 +522,7 @@ class BoomCore(usingTrace: Boolean)(implicit p: Parameters) extends BoomModule
     com_misp_jalr(w)  := com_is_jalr(w) && uop.debug_fsrc === BSRC_C 
     com_misp_ret(w)   := com_is_ret(w)  && uop.debug_fsrc === BSRC_C 
     com_misp_jalrcall(w) := com_is_jalrcall(w) && uop.debug_fsrc === BSRC_C 
+    com_pc_in_ckpt(w) := uop.debug_pc > 0x200000L.asUInt
 
     com_misp_cfi(w) := com_misp_br(w) || com_misp_jalr(w)
   }
@@ -557,7 +559,8 @@ class BoomCore(usingTrace: Boolean)(implicit p: Parameters) extends BoomModule
   val debug_commit_misp_br = RegInit(0.U(64.W))
   val debug_commit_misp_jalr = RegInit(0.U(64.W))
   val debug_commit_ftb_hit_misp_br = RegInit(0.U(64.W))
-  when(debug_cycle % 50000.U === 0.U){
+  val debug_pc_in_ckpt = RegInit(0.U(64.W))
+  when(debug_cycle % 50000.U === 0.U && debug_pc_in_ckpt =/= 0.U){
     // print the above counters in json format
     printf("{\"cycle\": %d, \"commit_inst\": %d, \"commit_misp_jalr\": %d, \"commit_br\": %d, \"commit_misp_br\": %d \"com_ftb_hit_misp_br\":%d}\n",
      RegNext(debug_cycle), RegNext(debug_commit_inst), RegNext(debug_commit_misp_jalr), 
@@ -575,6 +578,7 @@ class BoomCore(usingTrace: Boolean)(implicit p: Parameters) extends BoomModule
     debug_commit_misp_br := debug_commit_misp_br + PopCount(com_misp_br.asUInt)
     debug_commit_misp_jalr := debug_commit_misp_jalr + PopCount(com_misp_jalr.asUInt)
     debug_commit_ftb_hit_misp_br := debug_commit_ftb_hit_misp_br + PopCount(com_misp_br_ftbhit.asUInt)
+    debug_pc_in_ckpt := debug_pc_in_ckpt + PopCount(com_pc_in_ckpt.asUInt)
   }
 
   when (startCounter) {

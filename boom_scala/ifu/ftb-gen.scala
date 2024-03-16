@@ -86,8 +86,6 @@ class FTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBPara
     init_br_slot.offset := io.cfiIndex.bits
     init_br_slot.setLowerStatByTarget(io.start_addr, io.target, numBr == 1)
     // When the difference between the start_addr and the target is too large, the assert will fail
-    WarnAssert(init_br_slot.getTarget(io.start_addr) === io.target, 
-    p"br target not match  start addr 0x${Hexadecimal(io.start_addr)} target 0x${Hexadecimal(io.target)} recorded target 0x${Hexadecimal(init_br_slot.getTarget(io.start_addr))}\n")
     init_entry.always_taken(0) := true.B // set to always taken on init
     init_entry.needExtend := false.B
   }

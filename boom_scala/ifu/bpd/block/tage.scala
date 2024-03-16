@@ -157,7 +157,6 @@ class BlockTage(params: BlockTageParams = BlockTageParams())(implicit p: Paramet
 
     val allocate = s1_update_meta.allocate(idx)
     when (allocate.valid) {
-      XSDebug(true.B, p"Tage Allocate for idx ${idx} with table ${allocate.bits}\n")
       s1_update_mask (allocate.bits)(idx) := true.B
       s1_update_taken(allocate.bits)(idx) := s1_update.bits.cfi_taken
       s1_update_alloc(allocate.bits)(idx) := true.B
@@ -166,7 +165,6 @@ class BlockTage(params: BlockTageParams = BlockTageParams())(implicit p: Paramet
       s1_update_u     (allocate.bits)(idx) := 0.U
 
     } .otherwise {
-      XSDebug(true.B, p"Tage Decr useful for idx ${idx}\n")
       val provider = s1_update_meta.provider(idx)
       val decr_mask = Mux(provider.valid, ~MaskLower(UIntToOH(provider.bits)), 0.U)
 
