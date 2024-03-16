@@ -246,7 +246,7 @@ def drawplot(resname):
 
     # 8 Bytes
 
-    leftnames = ['com_misp_MPKI', 'com_br_MPKI', 'com_jalr_MPKI', 'ftb_misp_MPKI']
+    leftnames = ['com_misp_MPKI', 'com_br_MPKI', 'com_jalr_MPKI', 'com_br_ftb_hit_misp_MPKI']
     figs.append(draw_lines(xvalue, leftnames, [], xlabel, "IPC",""))
 
     pp = PdfPages(resname)
