@@ -504,6 +504,7 @@ class BoomCore(usingTrace: Boolean)(implicit p: Parameters) extends BoomModule
   val com_misp_ret  = Wire(Vec(coreWidth, Bool()))
   val com_misp_jalrcall  = Wire(Vec(coreWidth, Bool()))
   val com_misp_cfi  = Wire(Vec(coreWidth, Bool()))
+  val com_misp_br_ftbhit = Wire(Vec(coreWidth, Bool()))
 
   for(w <- 0 until coreWidth) {
     val uop = rob.io.commit.uops(w)
@@ -516,6 +517,7 @@ class BoomCore(usingTrace: Boolean)(implicit p: Parameters) extends BoomModule
     com_is_jalrcall(w) := valid && uop.is_jalr && (uop.ldst === 1.U)  
 
     com_misp_br(w)    := com_is_br(w)   && uop.debug_fsrc === BSRC_C
+    com_misp_br_ftbhit(w) := com_is_br(w) && uop.debug_fsrc === BSRC_C && uop.bpd_perf.ftb_hit
     com_misp_jalr(w)  := com_is_jalr(w) && uop.debug_fsrc === BSRC_C 
     com_misp_ret(w)   := com_is_ret(w)  && uop.debug_fsrc === BSRC_C 
     com_misp_jalrcall(w) := com_is_jalrcall(w) && uop.debug_fsrc === BSRC_C 
@@ -554,20 +556,25 @@ class BoomCore(usingTrace: Boolean)(implicit p: Parameters) extends BoomModule
   val debug_exe_misp_br = RegInit(0.U(64.W))
   val debug_commit_misp_br = RegInit(0.U(64.W))
   val debug_commit_misp_jalr = RegInit(0.U(64.W))
+  val debug_commit_ftb_hit_misp_br = RegInit(0.U(64.W))
   when(debug_cycle % 50000.U === 0.U){
     // print the above counters in json format
-    printf("{\"cycle\": %d, \"commit_inst\": %d, \"commit_misp_jalr\": %d, \"commit_br\": %d, \"exe_misp_br\": %d, \"commit_misp_br\": %d}\n", RegNext(debug_cycle), RegNext(debug_commit_inst), RegNext(debug_commit_misp_jalr), RegNext(debug_commit_br), RegNext(debug_exe_misp_br), RegNext(debug_commit_misp_br))
+    printf("{\"cycle\": %d, \"commit_inst\": %d, \"commit_misp_jalr\": %d, \"commit_br\": %d, \"commit_misp_br\": %d \"com_ftb_hit_misp_br\":%d}\n",
+     RegNext(debug_cycle), RegNext(debug_commit_inst), RegNext(debug_commit_misp_jalr), 
+     RegNext(debug_commit_br), RegNext(debug_commit_misp_br), RegNext(debug_commit_ftb_hit_misp_br))
     debug_commit_inst := 0.U
     debug_commit_br := 0.U
     debug_exe_misp_br := 0.U
     debug_commit_misp_br := 0.U
     debug_commit_misp_jalr := 0.U
+    debug_commit_ftb_hit_misp_br := 0.U
   }.otherwise{
     debug_commit_inst := debug_commit_inst + RegNext(PopCount(rob.io.commit.arch_valids.asUInt))
     debug_exe_misp_br := debug_exe_misp_br + Mux(exe_misp_br, 1.U, 0.U)
     debug_commit_br := debug_commit_br + PopCount(com_is_br.asUInt)
     debug_commit_misp_br := debug_commit_misp_br + PopCount(com_misp_br.asUInt)
     debug_commit_misp_jalr := debug_commit_misp_jalr + PopCount(com_misp_jalr.asUInt)
+    debug_commit_ftb_hit_misp_br := debug_commit_ftb_hit_misp_br + PopCount(com_misp_br_ftbhit.asUInt)
   }
 
   when (startCounter) {
@@ -626,8 +633,8 @@ class BoomCore(usingTrace: Boolean)(implicit p: Parameters) extends BoomModule
     event_counters.io.event_signals(35) := RegNext(PopCount(valid_masks & br_masks & fauftb_hit_masks))//br fauftb hit
     event_counters.io.event_signals(36) := RegNext(PopCount(valid_masks & br_masks & fauftb_hit_masks & (fauftb_taken_masks ^ taken_masks)))//br fauftb misp
     
-    event_counters.io.event_signals(37) :=  RegNext(PopCount(valid_masks & br_masks & ftb_hit_masks & (tage_taken_masks ^ taken_masks) & taken_masks))// br taken predict not taken
-    event_counters.io.event_signals(38) :=  RegNext(PopCount(valid_masks & br_masks & ftb_hit_masks & (tage_taken_masks ^ taken_masks) & (~taken_masks)))// br not taken predict taken
+    event_counters.io.event_signals(37) :=  RegNext(PopCount(com_misp_br_ftbhit))
+    // event_counters.io.event_signals(38) :=  RegNext(PopCount())// br not taken predict taken
     // event_counters.io.event_signals(38) :=  Mux(io.lsu.perf.acquire, 1.U, 0.U) //dcache send req to next level number
 
     event_counters.io.event_signals(39) :=  PopCount(exe_is_br.asUInt)       //execute br number

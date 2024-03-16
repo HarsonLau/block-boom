@@ -617,7 +617,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
    n_f2_bpd_resp.pred.jalr_target.bits,
    n_f2_bpd_resp.pred.target(n_f2_bpd_resp.pc)
   ) // FTB
-  assert(!s2_valid || n_f2_predicted_target =/= 0.U, "f2_predicted_target is 0\n")
+  WarnAssert(!s2_valid || n_f2_predicted_target =/= 0.U, "f2_predicted_target is 0\n")
 
   // val f2_predicted_ghist = s2_ghist.update(
   //   f2_bpd_resp.preds.map(p => p.is_br && p.predicted_pc.valid).asUInt & f2_mask,
@@ -941,7 +941,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
       val bpd_predicted_jalr_target = n_f3_bpd_resp.io.deq.bits.pred.jalr_target
       WarnAssert(bpd_predicted_target =/= 0.U, "bpd_predicted_target is 0\n")
       f3_targs (i) := Mux(brsigs.cfi_type === CFI_JALR,
-        Mux(bpd_predicted_jalr_target.valid, bpd_predicted_jalr_target.bits, nextFetch(f3_imemresp.pc)), // TODO: fixme for unrecorded JALR
+        Mux(bpd_predicted_jalr_target.valid, bpd_predicted_jalr_target.bits, bpd_predicted_target), // TODO: fixme for unrecorded JALR
         brsigs.target)
 
       val jalTargetMispredicted = (

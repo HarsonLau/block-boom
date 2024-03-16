@@ -33,6 +33,8 @@ trait hasFTBDebugConfigs {
   val enableF1vsF2BPRespDiff = false
   val enableFTBJsonPredictPrint = false
   val enableFTBJsonInsertPrint = false
+  val enableFTBExtendSetPredictPrint = true
+  val enableFTBExtendSetInsertPrint = true
 
   val enableBIMPredictPrint = false
   val enableBIMUpdatePrint = false
@@ -40,8 +42,8 @@ trait hasFTBDebugConfigs {
   val enableTagePredictPrint = false
   val enableTageUpdatePrint = false
 
-  val enableTageJsonPredictPrint = true
-  val enableTageJsonUpdatePrint = true
+  val enableTageJsonPredictPrint = false
+  val enableTageJsonUpdatePrint = false
 
   val enableCommitTracePrint = false
 }

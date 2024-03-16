@@ -186,7 +186,7 @@ class FTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBPara
     old_entry_jmp_target_modified.always_taken := 0.U.asTypeOf(Vec(numBr, Bool()))
     old_entry_jmp_target_modified.br_mask := pd.brMask
     val recordedTarget = old_entry_jmp_target_modified.tailSlot.getTarget(io.start_addr)
-    old_entry_jmp_target_modified.needExtend := recordedTarget =/= io.target
+    old_entry_jmp_target_modified.needExtend := recordedTarget =/= io.target && !new_jmp_is_ret
   }
 
   val old_entry_always_taken = WireInit(oe)

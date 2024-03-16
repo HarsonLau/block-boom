@@ -35,8 +35,8 @@ event 33,   ftb_hit
 event 34,   bim_misp
 event 35,   fauftb_hit
 event 36,   fauftb_misp
-event 37,   f2_t_false
-event 38,   f2_nt_false
+event 37,   com_misp_br_ftbhit
+event 38,   null
 event 39,   exe_is_br
 event 40,   exe_is_jalr
 event 41,   exe_is_ret
