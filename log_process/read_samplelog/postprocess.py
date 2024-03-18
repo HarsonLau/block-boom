@@ -72,8 +72,10 @@ if __name__ == "__main__":
         # 'aa985d9-L': 'block-16-TAGE-Fix',
         '0525342-M': 'Base-8-TAGE',
         '0525342-L': 'Base-16-TAGE',
-        'e57a851-M': 'Block-8-TAGE-IT',
-        'e57a851-L': 'Block-16-TAGE-IT'
+        # 'e57a851-M': 'Block-8-TAGE-IT',
+        '597dbda-M': 'Block-8-TAGE',
+        '597dbda-L': 'Block-16-TAGE',
+        # 'e57a851-L': 'Block-16-TAGE-IT'
         # '7478f2e-L': 'opt-16',
         # '7478f2e-M': 'opt-8',
         # 'f994918-M': 'base-16-br-dist',
@@ -97,7 +99,7 @@ if __name__ == "__main__":
     # '3ff5a552e15aba05d444ade657339caeb904d437':'6-128-7'
     }
 
-    whitelist=["exe_misp_MPKI","user_ipc","com_misp_MPKI"]
+    whitelist=["exe_misp_MPKI","user_ipc","com_misp_MPKI","com_br_MPKI","com_br_ftb_hit_misp_MPKI"]
     
     #open all the files in the input list, truncate the rows to the minimum length
     #skip all the rows with the first column not containing 'tage_br'
