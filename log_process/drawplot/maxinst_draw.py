@@ -245,24 +245,27 @@ def drawplot(resname):
         # '804474c-L': 'Base-16-TAGE',
 
     # 8 Bytes
-    leftnames = ["Base-8-TAGE_com_misp_MPKI", "Block-8-TAGE_com_misp_MPKI"]
+    # leftnames = ["Base-8-TAGE_com_misp_MPKI", "Block-8-TAGE_com_misp_MPKI"]
+    # figs.append(draw_lines(xvalue, leftnames, [], xlabel, "MPKI",""))
+
+    # leftnames = ["Base-8-TAGE_com_misp_MPKI", "Block-8-TAGE-PLRU_com_misp_MPKI"]
+    # figs.append(draw_lines(xvalue, leftnames, [], xlabel, "MPKI",""))
+
+    leftnames = ["Base-8-TAGE_com_misp_MPKI", "Block-8-TAGE-PLRU-probe_com_misp_MPKI"]
     figs.append(draw_lines(xvalue, leftnames, [], xlabel, "MPKI",""))
 
-    leftnames = ["Base-8-TAGE_com_misp_MPKI", "Block-8-TAGE-PLRU_com_misp_MPKI"]
-    figs.append(draw_lines(xvalue, leftnames, [], xlabel, "MPKI",""))
-
-    leftnames = ["Base-8-TAGE_user_ipc", "Block-8-TAGE_user_ipc"]
+    leftnames = ["Base-8-TAGE_user_ipc", "Block-8-TAGE-PLRU-probe_user_ipc"]
     figs.append(draw_lines(xvalue, leftnames, [], xlabel, "IPC",""))
 
     # 16 Bytes
-    leftnames = ["Base-16-TAGE_com_misp_MPKI", "Block-16-TAGE_com_misp_MPKI"]
-    figs.append(draw_lines(xvalue, leftnames, [], xlabel, "MPKI",""))
+    # leftnames = ["Base-16-TAGE_com_misp_MPKI", "Block-16-TAGE_com_misp_MPKI"]
+    # figs.append(draw_lines(xvalue, leftnames, [], xlabel, "MPKI",""))
 
-    leftnames = ["Base-16-TAGE_com_br_MPKI", "Block-16-TAGE_com_br_MPKI"]
-    figs.append(draw_lines(xvalue, leftnames, [], xlabel, "MPKI",""))
+    # leftnames = ["Base-16-TAGE_com_br_MPKI", "Block-16-TAGE_com_br_MPKI"]
+    # figs.append(draw_lines(xvalue, leftnames, [], xlabel, "MPKI",""))
 
-    leftnames = ["Base-16-TAGE_user_ipc", "Block-16-TAGE_user_ipc"]
-    figs.append(draw_lines(xvalue, leftnames, [], xlabel, "IPC",""))
+    # leftnames = ["Base-16-TAGE_user_ipc", "Block-16-TAGE_user_ipc"]
+    # figs.append(draw_lines(xvalue, leftnames, [], xlabel, "IPC",""))
 
     pp = PdfPages(resname)
     idx = 0
