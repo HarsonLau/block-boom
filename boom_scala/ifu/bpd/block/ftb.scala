@@ -288,6 +288,10 @@ object FTBMeta {
   }
 }
 
+class FTBTag(implicit p: Parameters) extends BoomBundle with FTBParams{
+  val tag = UInt(tagSize.W)
+  val valid = Bool()
+}
 
 class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   require(isPow2(numSets))
@@ -338,90 +342,70 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
       u_s0_entry_valid_slot_mask(w) &&  
       u.bits.ftb_entry.brValids(w) &&
       !(PriorityEncoder(u.bits.br_taken_mask) < w.U))) // TODO: temporarily disable always taken
+  val u_s0_valid = u.valid && u.bits.ftb_entry.valid && u.bits.ftb_entry.hasValidSlot
 
 
   // --------------------------------------------------------
   // **** (S1) ****
   // --------------------------------------------------------
 
-  // --- Predict ---
+  // --- Predict Logic ---
   val s1_req_rftb = VecInit(ftb.map(_.read(r_s0_idx, s0_valid)).map(_.asTypeOf(new FTBEntry)))
   val s1_req_rtag = VecInit(tag.map(_.read(r_s0_idx, s0_valid)))
-  val s1_req_ridx = RegNext(r_s0_idx)
+  val s1_req_ridx = Wire(UInt(log2Ceil(numSets).W))
+  s1_req_ridx := RegNext(r_s0_idx(log2Ceil(numSets) - 1, 0))
   val s1_req_rebtb = ebtb.read(s0_idx, s0_valid)
   val s1_req_tag = RegNext(s0_tag)
 
   val s1_hit_ohs = VecInit( (0 until nWays) map { i =>
-    val hit = s1_req_rtag(i) === s1_req_tag
-    hit
+    val hit_valid = s1_req_rtag(i) === s1_req_tag && s1_req_rftb(i).valid
+    hit_valid
   })
   val s1_valids = VecInit((0 until nWays) map { i =>
     val valid = s1_req_rftb(i).valid
     valid
   })
   val s1_hit = s1_hit_ohs.reduce(_||_)
+  XSDebug(PopCount(s1_hit_ohs) > 1.U, p"PC 0x${Hexadecimal(s1_pc)} has ${PopCount(s1_hit_ohs)} hits\n")
   val s1_hit_way = PriorityEncoder(s1_hit_ohs)
   val s1_ftb_entry = Mux(s1_hit, s1_req_rftb(s1_hit_way), 0.U.asTypeOf(new FTBEntry))
   val s1_hit_fallthrough_error = false.B
 
   s1_meta.hit := s1_hit && !s1_hit_fallthrough_error
+  s1_meta.writeWay := s1_hit_way.asUInt
 
-  // --- Update ---
+  // --- Update Logic ---
   val u_s1_pc = RegNext(u.bits.pc)
   val u_s1_target = RegNext(u.bits.target)
-  val u_s1_meta = RegNext(u_meta)
-  val u_s1_valid = RegNext(u.valid)
+  val u_s1_meta  = RegNext(u_meta)
+  val u_s1_tag   = RegNext(u_s0_tag)
+  val u_s1_valid = RegNext(u_s0_valid)
+
+  // probe
+  val u_s1_req_rftb = VecInit(ftb.map(_.read(u_s0_idx, u_s0_valid)).map(_.asTypeOf(new FTBEntry)))
+  val u_s1_req_rtag = VecInit(tag.map(_.read(u_s0_idx, u_s0_valid)))
+  val u_s1_req_valids = VecInit((0 until nWays) map { i =>
+    val valid = u_s1_req_rftb(i).valid
+    valid
+  })
+  val u_s1_req_hits = VecInit((0 until nWays) map { i =>
+    val hit_valid = u_s1_req_rtag(i) === u_s1_tag && u_s1_req_rftb(i).valid
+    hit_valid
+  })
+  val u_s1_hit_way = PriorityEncoder(u_s1_req_hits)
+  val u_s1_hit = u_s1_req_hits.reduce(_||_)
+
   val u_s1_commit_valid = RegNext(u.valid && u.bits.is_commit_update)
   val u_s1_cfi_is_jalr = RegNext(u.bits.cfi_is_jalr && !u.bits.cfi_is_ret)
-  val u_s1_tag       = RegNext(u_s0_tag)
-  val u_s1_idx = RegNext(u_s0_idx)
+  val u_s1_idx = Wire(UInt(log2Ceil(numSets).W))
+  u_s1_idx := RegNext(u_s0_idx)
   val u_s1_ftb_entry = RegEnable(u.bits.ftb_entry, u.valid)
   val u_s1_ftb_entry_empty = !u_s1_ftb_entry.valid || !u_s1_ftb_entry.hasValidSlot // if the entry is invalid or contains no valid slot
 
   val u_s1_need_extend = u_s1_commit_valid && !u_s1_ftb_entry_empty && u_s1_ftb_entry.isJalr && u_s1_ftb_entry.needExtend && u_s1_cfi_is_jalr
 
-  for ( w <- 0 until nWays){
-    when (doing_reset || ((u_s1_meta.writeWay === w.U || (w == 0 && nWays == 1).B) && !u_s1_ftb_entry_empty && u_s1_valid)) {
-      ftb(w).write(
-        Mux(doing_reset, reset_idx, u_s1_idx),
-        Mux(doing_reset, 0.U.asTypeOf(new FTBEntry), u_s1_ftb_entry)
-      )
-      tag(w).write(
-        Mux(doing_reset, reset_idx, u_s1_idx),
-        Mux(doing_reset, 0.U.asTypeOf(UInt(tagSize.W)), u_s1_tag)
-      )
-    }
-  }
-  when(u_s1_need_extend){
-    if(enableFTBExtendSetInsertPrint){
-      val cond = true
-      XSDebug(cond.B, p"Insert for PC 0x${Hexadecimal(u_s1_pc)} at ${s1_update_idx} value 0x${Hexadecimal(u_s1_target)}\n")
-    }
-    ebtb.write(s1_update_idx, u_s1_target)
-  }
 
   // --- Replace ---
-  val touch_set = Seq.fill(1)(Wire(UInt(log2Ceil(numSets).W)))
-  val touch_way = Seq.fill(1)(Wire(Valid(UInt(log2Ceil(numWays).W))))
-
-  val write_set = Wire(UInt(log2Ceil(numSets).W))
-  val write_way = Wire(Valid(UInt(log2Ceil(numWays).W)))
-
-  val read_set = Wire(UInt(log2Ceil(numSets).W))
-  val read_way = Wire(Valid(UInt(log2Ceil(numWays).W)))
-  read_set := s1_req_ridx
-  read_way.valid := s1_hit
-  read_way.bits  := s1_hit_way
-
-  write_set := u_s1_idx
-  write_way.valid := u_s1_valid && !u_s1_ftb_entry_empty
-  write_way.bits := u_s1_meta.writeWay
-
-  touch_set(0) := Mux(write_way.valid, write_set, read_set)
-  touch_way(0).valid := write_way.valid || read_way.valid
-  touch_way(0).bits := Mux(write_way.valid, write_way.bits, read_way.bits)
-
-  replacer.access(touch_set, touch_way)
 
   // Select the update allocate way
   // Selection logic:
@@ -438,7 +422,32 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
       w
     }
   }
-  s1_meta.writeWay := Mux(s1_hit, s1_hit_way.asUInt, alloc_way(s1_valids.asUInt, s1_req_ridx.asUInt).asUInt)
+  val u_s1_write_way = Mux(u_s1_meta.hit,
+    u_s1_meta.writeWay,
+    Mux(u_s1_hit, u_s1_hit_way, alloc_way(u_s1_req_valids.asUInt, u_s1_idx))
+   )
+
+  val touch_set = Seq.fill(1)(Wire(UInt(log2Ceil(numSets).W)))
+  val touch_way = Seq.fill(1)(Wire(Valid(UInt(log2Ceil(numWays).W))))
+
+  val write_set = Wire(UInt(log2Ceil(numSets).W))
+  val write_way = Wire(Valid(UInt(log2Ceil(numWays).W)))
+
+  val read_set = Wire(UInt(log2Ceil(numSets).W))
+  val read_way = Wire(Valid(UInt(log2Ceil(numWays).W)))
+  read_set := s1_req_ridx
+  read_way.valid := s1_hit
+  read_way.bits  := s1_hit_way
+
+  write_set := u_s1_idx
+  write_way.valid := u_s1_valid
+  write_way.bits := u_s1_write_way
+
+  touch_set(0) := Mux(write_way.valid, write_set, read_set)
+  touch_way(0).valid := write_way.valid// || read_way.valid
+  touch_way(0).bits := Mux(write_way.valid, write_way.bits, read_way.bits)
+
+  replacer.access(touch_set, touch_way)
 
   // --------------------------------------------------------
   // **** (S2) ****
@@ -460,6 +469,26 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
     }
   }
 
+  val u_s2_write_way = RegNext(u_s1_write_way)
+  for ( w <- 0 until nWays){
+    when (doing_reset || ((u_s2_write_way === w.U || (w == 0 && nWays == 1).B) && RegNext(write_way.valid))) {
+      ftb(w).write(
+        Mux(doing_reset, reset_idx, RegNext(u_s1_idx)),
+        Mux(doing_reset, 0.U.asTypeOf(new FTBEntry), RegNext(u_s1_ftb_entry))
+      )
+      tag(w).write(
+        Mux(doing_reset, reset_idx, RegNext(u_s1_idx)),
+        Mux(doing_reset, 0.U.asTypeOf(UInt(tagSize.W)), RegNext(u_s1_tag))
+      )
+    }
+  }
+  when(RegNext(u_s1_need_extend)){
+    if(enableFTBExtendSetInsertPrint){
+      val cond = true
+      XSDebug(cond.B, p"Insert for PC 0x${Hexadecimal(RegNext(u_s1_pc))} at ${RegNext(s1_update_idx)} value 0x${Hexadecimal(RegNext(u_s1_target))}\n")
+    }
+    ebtb.write(RegNext(s1_update_idx), RegNext(u_s1_target))
+  }
   // --------------------------------------------------------
   // **** (S3) ****
   // --------------------------------------------------------
@@ -475,7 +504,7 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
       }
     }
   }
-  io.resp.f3_meta := RegNext(RegNext(s1_meta)).asUInt
+  io.resp.f3_meta := RegNext(RegNext(s1_meta.asUInt))
   io.resp.last_stage_entry := Mux(RegNext(RegNext(s1_hit && !s1_hit_fallthrough_error)), RegNext(RegNext(s1_ftb_entry)), io.resp_in(0).last_stage_entry)
 
 

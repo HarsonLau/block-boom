@@ -75,6 +75,7 @@ if __name__ == "__main__":
         # 'e57a851-M': 'Block-8-TAGE-IT',
         '597dbda-M': 'Block-8-TAGE',
         '597dbda-L': 'Block-16-TAGE',
+        '557770c-M': 'Block-8-TAGE-PLRU'
         # 'e57a851-L': 'Block-16-TAGE-IT'
         # '7478f2e-L': 'opt-16',
         # '7478f2e-M': 'opt-8',

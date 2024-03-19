@@ -130,6 +130,8 @@ class FTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBPara
     }
   })
 
+  XSDebug(is_new_br && new_br_offset >= oe.pftAddr && oe.valid && !oe.carry, p"new br overflow at 0x${Hexadecimal(new_br_offset)}\n")
+
   val old_entry_modified = WireInit(io.old_entry)
   for (i <- 0 until numBr) {
     val slot = old_entry_modified.allSlotsForBr(i)

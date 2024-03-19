@@ -248,6 +248,9 @@ def drawplot(resname):
     leftnames = ["Base-8-TAGE_com_misp_MPKI", "Block-8-TAGE_com_misp_MPKI"]
     figs.append(draw_lines(xvalue, leftnames, [], xlabel, "MPKI",""))
 
+    leftnames = ["Base-8-TAGE_com_misp_MPKI", "Block-8-TAGE-PLRU_com_misp_MPKI"]
+    figs.append(draw_lines(xvalue, leftnames, [], xlabel, "MPKI",""))
+
     leftnames = ["Base-8-TAGE_user_ipc", "Block-8-TAGE_user_ipc"]
     figs.append(draw_lines(xvalue, leftnames, [], xlabel, "IPC",""))
 
