@@ -113,7 +113,7 @@ class FauFTB(implicit p: Parameters) extends BlockPredictorBank with FauFTBParam
     io.resp.f1.perfs(i).fauftb_hit := s1_hit
     io.resp.f1.perfs(i).fauftb_taken := s1_hit_full_pred.br_taken_mask(i)
 
-    io.resp.f1.perfs(i).ftb_hit := false.B
+    io.resp.f1.perfs(i).ftb_entry_hit := false.B
     io.resp.f1.perfs(i).bim_taken := false.B
 
     io.resp.f1.perfs(i).tage_hit := false.B

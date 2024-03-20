@@ -818,12 +818,13 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   val f3_recorded_cfi_mask = Wire(Vec(fetchWidth, Bool()))
   for(i <- 0 until fetchWidth) {
     f3_recorded_cfi_mask(i) := n_f3_bpd_resp.io.deq.bits.pred.validPredict(i.U)
+    f3_fetch_bundle.bpd_perf(i).ftb_entry_hit := n_f3_bpd_resp.io.deq.bits.pred.hit
   }
   val f3_recorded_cfi_offset = n_f3_bpd_resp.io.deq.bits.pred.offsets
   for(i <- 0 until numBr){
     val offset = f3_recorded_cfi_offset(i)
     when(f3_recorded_cfi_mask(offset)){
-      f3_fetch_bundle.bpd_perf(offset) := n_f3_bpd_resp.io.deq.bits.pred.perfs(i)
+      f3_fetch_bundle.bpd_perf(offset).ftb_slot_hit := true.B
     }
   }
   val f3_block_mask = n_f3_bpd_resp.io.deq.bits.pred.blockMask

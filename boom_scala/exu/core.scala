@@ -504,7 +504,8 @@ class BoomCore(usingTrace: Boolean)(implicit p: Parameters) extends BoomModule
   val com_misp_ret  = Wire(Vec(coreWidth, Bool()))
   val com_misp_jalrcall  = Wire(Vec(coreWidth, Bool()))
   val com_misp_cfi  = Wire(Vec(coreWidth, Bool()))
-  val com_misp_br_ftbhit = Wire(Vec(coreWidth, Bool()))
+  val com_misp_br_ftb_entry_hit = Wire(Vec(coreWidth, Bool()))
+  val com_misp_br_ftb_slot_hit = Wire(Vec(coreWidth, Bool()))
   val com_pc_in_ckpt = Wire(Vec(coreWidth, Bool()))
 
   for(w <- 0 until coreWidth) {
@@ -518,11 +519,12 @@ class BoomCore(usingTrace: Boolean)(implicit p: Parameters) extends BoomModule
     com_is_jalrcall(w) := valid && uop.is_jalr && (uop.ldst === 1.U)  
 
     com_misp_br(w)    := com_is_br(w)   && uop.debug_fsrc === BSRC_C
-    com_misp_br_ftbhit(w) := com_is_br(w) && uop.debug_fsrc === BSRC_C && uop.bpd_perf.ftb_hit
+    com_misp_br_ftb_entry_hit(w) := com_is_br(w) && uop.debug_fsrc === BSRC_C && uop.bpd_perf.ftb_entry_hit
+    com_misp_br_ftb_slot_hit(w) := com_is_br(w) && uop.debug_fsrc === BSRC_C && uop.bpd_perf.ftb_slot_hit
     com_misp_jalr(w)  := com_is_jalr(w) && uop.debug_fsrc === BSRC_C 
     com_misp_ret(w)   := com_is_ret(w)  && uop.debug_fsrc === BSRC_C 
     com_misp_jalrcall(w) := com_is_jalrcall(w) && uop.debug_fsrc === BSRC_C 
-    com_pc_in_ckpt(w) := uop.debug_pc > 0x200000L.asUInt
+    com_pc_in_ckpt(w) := uop.debug_pc > 0x200000L.asUInt && uop.debug_pc < 0x500000L.asUInt
 
     com_misp_cfi(w) := com_misp_br(w) || com_misp_jalr(w)
   }
@@ -558,27 +560,34 @@ class BoomCore(usingTrace: Boolean)(implicit p: Parameters) extends BoomModule
   val debug_exe_misp_br = RegInit(0.U(64.W))
   val debug_commit_misp_br = RegInit(0.U(64.W))
   val debug_commit_misp_jalr = RegInit(0.U(64.W))
-  val debug_commit_ftb_hit_misp_br = RegInit(0.U(64.W))
+  val debug_commit_ftb_entry_hit_misp_br = RegInit(0.U(64.W))
+  val debug_commit_ftb_slot_hit_misp_br = RegInit(0.U(64.W))
   val debug_pc_in_ckpt = RegInit(0.U(64.W))
-  when(debug_cycle % 50000.U === 0.U && debug_pc_in_ckpt =/= 0.U){
+  when(debug_commit_inst % 20000.U < coreWidth.asUInt && debug_pc_in_ckpt =/= 0.U){
     // print the above counters in json format
-    printf("{\"cycle\": %d, \"commit_inst\": %d, \"commit_misp_jalr\": %d, \"commit_br\": %d, \"commit_misp_br\": %d \"com_ftb_hit_misp_br\":%d}\n",
-     RegNext(debug_cycle), RegNext(debug_commit_inst), RegNext(debug_commit_misp_jalr), 
-     RegNext(debug_commit_br), RegNext(debug_commit_misp_br), RegNext(debug_commit_ftb_hit_misp_br))
-    debug_commit_inst := 0.U
-    debug_commit_br := 0.U
-    debug_exe_misp_br := 0.U
-    debug_commit_misp_br := 0.U
-    debug_commit_misp_jalr := 0.U
-    debug_commit_ftb_hit_misp_br := 0.U
+    printf("{\"cycle\": %d, \"commit_inst\": %d, \"commit_misp_jalr\": %d, \"commit_br\": %d, \"commit_misp_br\": %d \"com_ftb_entry_hit_misp_br\":%d \"com_ftb_slot_hit_misp_br\":%d}\n",
+     (debug_cycle),(debug_commit_inst),(debug_commit_misp_jalr), 
+     (debug_commit_br),(debug_commit_misp_br),
+     (debug_commit_ftb_entry_hit_misp_br),(debug_commit_ftb_slot_hit_misp_br))
+    debug_commit_inst := debug_commit_inst + RegNext(PopCount(rob.io.commit.arch_valids.asUInt))
+    debug_commit_br := PopCount(com_is_br.asUInt)
+    debug_exe_misp_br := PopCount(exe_misp_br.asUInt)
+    debug_commit_misp_br := PopCount(com_misp_br.asUInt)
+    debug_commit_misp_jalr := PopCount(com_misp_jalr.asUInt)
+    debug_pc_in_ckpt := PopCount(com_pc_in_ckpt.asUInt)
+
+    debug_commit_ftb_entry_hit_misp_br := PopCount(com_misp_br_ftb_entry_hit.asUInt)
+    debug_commit_ftb_slot_hit_misp_br := PopCount(com_misp_br_ftb_slot_hit.asUInt)
   }.otherwise{
     debug_commit_inst := debug_commit_inst + RegNext(PopCount(rob.io.commit.arch_valids.asUInt))
     debug_exe_misp_br := debug_exe_misp_br + Mux(exe_misp_br, 1.U, 0.U)
     debug_commit_br := debug_commit_br + PopCount(com_is_br.asUInt)
     debug_commit_misp_br := debug_commit_misp_br + PopCount(com_misp_br.asUInt)
     debug_commit_misp_jalr := debug_commit_misp_jalr + PopCount(com_misp_jalr.asUInt)
-    debug_commit_ftb_hit_misp_br := debug_commit_ftb_hit_misp_br + PopCount(com_misp_br_ftbhit.asUInt)
     debug_pc_in_ckpt := debug_pc_in_ckpt + PopCount(com_pc_in_ckpt.asUInt)
+
+    debug_commit_ftb_entry_hit_misp_br := debug_commit_ftb_entry_hit_misp_br + PopCount(com_misp_br_ftb_entry_hit.asUInt)
+    debug_commit_ftb_slot_hit_misp_br := debug_commit_ftb_slot_hit_misp_br + PopCount(com_misp_br_ftb_slot_hit.asUInt)
   }
 
   when (startCounter) {
@@ -626,18 +635,18 @@ class BoomCore(usingTrace: Boolean)(implicit p: Parameters) extends BoomModule
     val bpd_perfs = rob.io.commit.uops.map(_.bpd_perf)
     val fauftb_hit_masks  = VecInit(bpd_perfs.map(_.fauftb_hit)).asUInt
     val fauftb_taken_masks= VecInit(bpd_perfs.map(_.fauftb_taken)).asUInt
-    val ftb_hit_masks     = VecInit(bpd_perfs.map(_.ftb_hit)).asUInt
     val bim_taken_masks   = VecInit(bpd_perfs.map(_.bim_taken)).asUInt
     val tage_hit_masks    = VecInit(bpd_perfs.map(_.tage_hit)).asUInt
     val tage_taken_masks  = VecInit(bpd_perfs.map(_.tage_taken)).asUInt
     event_counters.io.event_signals(31) := RegNext(PopCount(valid_masks & br_masks & tage_hit_masks))//br tage hit
     event_counters.io.event_signals(32) := RegNext(PopCount(valid_masks & br_masks & tage_hit_masks & (tage_taken_masks ^ taken_masks)))//br tage misp
-    event_counters.io.event_signals(33) := RegNext(PopCount(valid_masks & br_masks & ftb_hit_masks))//br ftb hit
-    event_counters.io.event_signals(34) := RegNext(PopCount(valid_masks & br_masks & ftb_hit_masks & (bim_taken_masks ^ taken_masks)))//br bim misp
+    event_counters.io.event_signals(33) := 0.U
+    event_counters.io.event_signals(34) := 0.U
     event_counters.io.event_signals(35) := RegNext(PopCount(valid_masks & br_masks & fauftb_hit_masks))//br fauftb hit
     event_counters.io.event_signals(36) := RegNext(PopCount(valid_masks & br_masks & fauftb_hit_masks & (fauftb_taken_masks ^ taken_masks)))//br fauftb misp
     
-    event_counters.io.event_signals(37) :=  RegNext(PopCount(com_misp_br_ftbhit))
+    event_counters.io.event_signals(37) :=  RegNext(PopCount(com_misp_br_ftb_entry_hit))
+    event_counters.io.event_signals(38) :=  RegNext(PopCount(com_misp_br_ftb_slot_hit))
     // event_counters.io.event_signals(38) :=  RegNext(PopCount())// br not taken predict taken
     // event_counters.io.event_signals(38) :=  Mux(io.lsu.perf.acquire, 1.U, 0.U) //dcache send req to next level number
 

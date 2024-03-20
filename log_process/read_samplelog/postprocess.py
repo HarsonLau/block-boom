@@ -101,7 +101,7 @@ if __name__ == "__main__":
     # '3ff5a552e15aba05d444ade657339caeb904d437':'6-128-7'
     }
 
-    whitelist=["exe_misp_MPKI","user_ipc","com_misp_MPKI","com_br_MPKI","com_br_ftb_hit_misp_MPKI"]
+    whitelist=["exe_misp_MPKI","user_ipc","com_misp_MPKI","com_br_MPKI","com_br_ftb_entry_hit_MPKI","com_br_ftb_slot_hit_MPKI"]
     
     #open all the files in the input list, truncate the rows to the minimum length
     #skip all the rows with the first column not containing 'tage_br'

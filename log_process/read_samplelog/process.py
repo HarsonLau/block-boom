@@ -24,7 +24,8 @@ def process_infos(startinfo, eventinfos):
 
     eventinfos.append(cal_fraction(eventinfos[1], eventinfos[0], "user_ipc"))
     # eventinfos.append(cal_fraction(eventinfos[31],eventinfos[32],"f3_hit_misp_rate"))
-    eventinfos.append(cal_fraction(eventinfos[37] * 1000, eventinfos[1], "com_br_ftb_hit_misp_MPKI"))
+    eventinfos.append(cal_fraction(eventinfos[37] * 1000, eventinfos[1], "com_br_ftb_entry_hit_MPKI"))
+    eventinfos.append(cal_fraction(eventinfos[38] * 1000, eventinfos[1], "com_br_ftb_slot_hit_MPKI"))
 
 
     #eventinfos.append(cal_fraction(eventinfos[35],eventinfos[50],"tage_jalr_hit_rate"))

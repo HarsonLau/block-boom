@@ -31,12 +31,12 @@ event 29,   iss_val_notFull
 event 30,   spec_miss_issuop
 event 31,   tage_br_hit
 event 32,   tage_br_misp
-event 33,   ftb_hit
+event 33,   ftb_entry_hit
 event 34,   bim_misp
 event 35,   fauftb_hit
 event 36,   fauftb_misp
-event 37,   com_misp_br_ftbhit
-event 38,   null
+event 37,   com_misp_br_ftb_entry_hit
+event 38,   com_misp_br_ftb_slot_hit
 event 39,   exe_is_br
 event 40,   exe_is_jalr
 event 41,   exe_is_ret

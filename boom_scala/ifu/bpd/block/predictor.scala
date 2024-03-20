@@ -51,7 +51,8 @@ class BlockPredictionPerf(implicit p: Parameters) extends BoomBundle()(p){
   val fauftb_hit = Bool()
   val fauftb_taken = Bool()
 
-  val ftb_hit = Bool()
+  val ftb_entry_hit = Bool()
+  val ftb_slot_hit = Bool()
   val bim_taken = Bool()
 
   val tage_hit = Bool()
