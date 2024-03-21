@@ -334,15 +334,7 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   val u_s0_tag = ftbUpdateAddr.getTag(u.bits.pc)
   val u_s0_idx = ftbUpdateAddr.getIdx(u.bits.pc)
   val u_s0_entry_valid_slot_mask = u.bits.ftb_entry.brValids
-  val u_s0_br_update_valids =
-    VecInit((0 until numBr).map(w =>
-      u.valid &&
-      !u.bits.is_btb_mispredict_update &&
-      u.bits.ftb_entry.valid &&
-      u_s0_entry_valid_slot_mask(w) &&  
-      u.bits.ftb_entry.brValids(w) &&
-      !(PriorityEncoder(u.bits.br_taken_mask) < w.U))) // TODO: temporarily disable always taken
-  val u_s0_valid = u.valid && u.bits.ftb_entry.valid && u.bits.ftb_entry.hasValidSlot
+  val u_s0_valid = u.valid && u.bits.ftb_entry.valid && u.bits.ftb_entry.hasValidSlot && u.bits.is_commit_update
 
 
   // --------------------------------------------------------
@@ -352,8 +344,7 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   // --- Predict Logic ---
   val s1_req_rftb = VecInit(ftb.map(_.read(r_s0_idx, s0_valid)).map(_.asTypeOf(new FTBEntry)))
   val s1_req_rtag = VecInit(tag.map(_.read(r_s0_idx, s0_valid)))
-  val s1_req_ridx = Wire(UInt(log2Ceil(numSets).W))
-  s1_req_ridx := RegNext(r_s0_idx(log2Ceil(numSets) - 1, 0))
+  val s1_req_ridx = RegNext(r_s0_idx)
   val s1_req_rebtb = ebtb.read(s0_idx, s0_valid)
   val s1_req_tag = RegNext(s0_tag)
 
@@ -395,14 +386,14 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   val u_s1_hit_way = PriorityEncoder(u_s1_req_hits)
   val u_s1_hit = u_s1_req_hits.reduce(_||_)
 
-  val u_s1_commit_valid = RegNext(u.valid && u.bits.is_commit_update)
+  val u_s1_commit_valid = RegNext(u_s0_valid && u.bits.is_commit_update)
   val u_s1_cfi_is_jalr = RegNext(u.bits.cfi_is_jalr && !u.bits.cfi_is_ret)
-  val u_s1_idx = Wire(UInt(log2Ceil(numSets).W))
-  u_s1_idx := RegNext(u_s0_idx)
+  // val u_s1_idx = Wire(UInt(log2Ceil(numSets).W))
+  // u_s1_idx := RegNext(u_s0_idx)
+  val u_s1_idx = RegNext(u_s0_idx)
   val u_s1_ftb_entry = RegEnable(u.bits.ftb_entry, u.valid)
-  val u_s1_ftb_entry_empty = !u_s1_ftb_entry.valid || !u_s1_ftb_entry.hasValidSlot // if the entry is invalid or contains no valid slot
 
-  val u_s1_need_extend = u_s1_commit_valid && !u_s1_ftb_entry_empty && u_s1_ftb_entry.isJalr && u_s1_ftb_entry.needExtend && u_s1_cfi_is_jalr
+  val u_s1_need_extend = u_s1_commit_valid && u_s1_ftb_entry.needExtend
 
 
   // --- Replace ---
@@ -459,7 +450,6 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   io.resp.f3.jalr_target.bits := RegNext(io.resp.f2.jalr_target.bits)
   when(RegNext(s1_hit && !s1_hit_fallthrough_error)) {
     io.resp.f2.fromFtbEntry(RegNext(s1_ftb_entry), RegNext(s1_pc))
-    io.resp.f2.hit := true.B
     io.resp.f2.jalr_target.valid := RegNext(s1_ftb_entry.needExtend)
     for (i <- 0 until numBr) {
       io.resp.f2.perfs(i).ftb_entry_hit := true.B
@@ -468,6 +458,7 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
       }
     }
   }
+  io.resp.f2.hit := RegNext(s1_hit && !s1_hit_fallthrough_error)
 
   val u_s2_write_way = RegNext(u_s1_write_way)
   for ( w <- 0 until nWays){
@@ -495,7 +486,6 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
 
   when(RegNext(RegNext(s1_hit && !s1_hit_fallthrough_error))) {
     io.resp.f3.fromFtbEntry(RegNext(RegNext(s1_ftb_entry)), RegNext(RegNext(s1_pc)))
-    io.resp.f3.hit := true.B
     io.resp.f3.jalr_target.valid := RegNext(RegNext(s1_ftb_entry.needExtend))
     for(i <- 0 until numBr) {
       io.resp.f3.perfs(i).ftb_entry_hit := true.B
@@ -504,6 +494,7 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
       }
     }
   }
+  io.resp.f3.hit := RegNext(RegNext(s1_hit && !s1_hit_fallthrough_error))
   io.resp.f3_meta := RegNext(RegNext(s1_meta.asUInt))
   io.resp.last_stage_entry := Mux(RegNext(RegNext(s1_hit && !s1_hit_fallthrough_error)), RegNext(RegNext(s1_ftb_entry)), io.resp_in(0).last_stage_entry)
 
@@ -528,7 +519,8 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   }
 
   if(enableFTBJsonPredictPrint){
-    val cond = true.B
+    val cond = debug_cycle > 8900000L.asUInt 
+    // val cond = true.B
     // {
     //   "cycle": "1",
     //   "action": "insert",
@@ -538,8 +530,14 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
     //   "tag": "0x0",
     //   "way": "1"
     // }
+    val s2_cfi_valids = RegNext(s1_ftb_entry.validSlots)
+    val s2_cfi_offsets = RegNext(s1_ftb_entry.getOffsetVec)
     when(cond){
-      printf("{\"cycle\": \"%d\", \"action\": \"predict\", \"pc\": \"0x%x\", \"ftb_hit\": \"%d\", \"index\": \"%d\", \"tag\": \"0x%x\", \"way\": \"%d\"},\n", RegNext(debug_cycle),s1_pc, s1_meta.hit, RegNext(r_s0_idx), s1_req_tag, s1_meta.writeWay)
+      printf("{\"cycle\": \"%d\", \"action\": \"predict\", \"pc\": \"0x%x\", \"ftb_hit\": \"%d\", \"index\": \"%d\", \"tag\": \"0x%x\", \"way\": \"%d\", \"valids\":[%d, %d], \"offsets\":[%d, %d]},\n", 
+      debug_cycle, s2_pc, RegNext(s1_hit && !s1_hit_fallthrough_error), RegNext(RegNext(r_s0_idx)), RegNext(s1_req_tag), RegNext(s1_meta.writeWay),
+      s2_cfi_valids(0), s2_cfi_valids(1),
+      s2_cfi_offsets(0), s2_cfi_offsets(1),
+      )
     }
   }
   
@@ -553,10 +551,9 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
     XSDebug(cond, p"-----------------------------------\n")
   }
 
-  // s1
+  // s2
   if(enableFTBJsonInsertPrint){
-    // val cond = u.valid && u.bits.ftb_entry.valid && u.bits.ftb_entry.hasValidSlot
-    val cond = u_s1_valid && u_s1_ftb_entry.valid && u_s1_ftb_entry.hasValidSlot
+    val cond = RegNext(write_way.valid) && debug_cycle > 8900000L.asUInt
     // {
     //   "cycle": "1",
     //   "action": "insert",
@@ -567,9 +564,15 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
     //   "way": "1"
     // }
     // XSDebug(cond, p"{{\"cycle\": \"${debug_cycle}\", \"action\": \"insert\", \"pc\": \"0x${Hexadecimal(u.bits.pc)}\", \"ftb_hit\": \"${u_meta.hit}\"}}\n")
+    val u_s2_valids = RegNext(u_s1_ftb_entry.validSlots)
+    val u_s2_offsets = RegNext(u_s1_ftb_entry.getOffsetVec)
     when(cond){
       // printf("{\"cycle\": \"%d\", \"action\": \"insert\", \"pc\": \"0x%x\", \"ftb_hit\": \"%d\"},\n", debug_cycle, u.bits.pc, u_meta.hit)
-      printf("{\"cycle\": \"%d\", \"action\": \"insert\", \"pc\": \"0x%x\", \"ftb_hit\": \"%d\", \"index\": \"%d\", \"tag\": \"0x%x\", \"way\": \"%d\"},\n", debug_cycle,RegNext(u.bits.pc), u_s1_meta.hit, u_s1_idx, u_s1_tag, u_s1_meta.writeWay)
+      printf("{\"cycle\": \"%d\", \"action\": \"insert\", \"pc\": \"0x%x\", \"ftb_hit\": \"%d\", \"index\": \"%d\", \"tag\": \"0x%x\", \"way\": \"%d\", \"valids\":[%d, %d], \"offsets\":[%d, %d]},\n", 
+      debug_cycle, RegNext(RegNext(u.bits.pc)), RegNext(u_s1_meta.hit), RegNext(u_s1_idx), RegNext(u_s1_tag), u_s2_write_way,
+      u_s2_valids(0), u_s2_valids(1),
+      u_s2_offsets(0), u_s2_offsets(1)
+      )
     }
   }
 

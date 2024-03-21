@@ -476,24 +476,14 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   icache.io.s1_kill  := tlb.io.resp.miss || f1_clear
 
   val f1_mask = fetchMask(s1_vpc)
-  // val f1_redirects = (0 until fetchWidth) map { i =>
-  //   s1_valid && f1_mask(i) && s1_bpd_resp.preds(i).predicted_pc.valid &&
-  //   (s1_bpd_resp.preds(i).is_jal ||
-  //     (s1_bpd_resp.preds(i).is_br && s1_bpd_resp.preds(i).taken))
-  // }
-  // val f1_redirect_idx = PriorityEncoder(f1_redirects)
   val n_f1_redirect_idx = n_s1_bpd_resp.pred.cfiIndex.bits // FTB
-  // val f1_do_redirect = f1_redirects.reduce(_||_) && useBPD.B
   val n_f1_do_redirect = n_s1_bpd_resp.pred.cfiIndex.valid && useBPD.B // FTB
-  // assert(!n_f1_do_redirect)
-  // val f1_targs = s1_bpd_resp.preds.map(_.predicted_pc.bits)
-  // val f1_predicted_target = Mux(f1_do_redirect,
-  //                               f1_targs(f1_redirect_idx),
-  //                               nextFetch(s1_vpc))
   
-  val n_f1_predicted_target = n_s1_bpd_resp.pred.target(n_s1_bpd_resp.pc) // FTB
+  val target_candidate = n_s1_bpd_resp.pred.target(n_s1_bpd_resp.pc)
+  // val n_f1_predicted_target = Mux(target_candidate === 0.U, nextFetch(s1_vpc), target_candidate) // FTB
+  val n_f1_predicted_target = target_candidate
 
-  assert(!s1_valid || n_f1_predicted_target =/= 0.U, "f1_predicted_target is 0\n")
+  // assert(!s1_valid || n_f1_predicted_target =/= 0.U, "f1_predicted_target is 0\n")
 
   // when n_f1_do_redirect is true, n_s1_bpd_resp.pred.hit must be true
   assert(!n_f1_do_redirect || n_s1_bpd_resp.pred.hit, "uftb not hit, but do_redirect is true\n")
@@ -502,7 +492,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   assert(n_s1_bpd_resp.pred.hit || n_f1_predicted_target === nextFetch(n_s1_bpd_resp.pc), "uftb not hit, but predicted target is not nextFetch(n_s1_bpd_resp.pc)\n")
 
   if(enableF1RedirectInfoPrint || enableWatchPC){
-    val printCond = s1_valid
+    val printCond = s1_valid && n_f1_predicted_target === 0.U
     val watchCond = s1_valid && s1_vpc === watchPC.U
     val cond = if(enableF1RedirectInfoPrint) printCond else watchCond
     XSDebug(cond, "-----------------F1 NPC Info-----------------\n")
@@ -554,20 +544,20 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     s0_valid     := !(s1_tlb_resp.ae.inst || s1_tlb_resp.pf.inst)
     s0_tsrc      := BSRC_1
     s0_vpc       := n_f1_predicted_target
-    assert(n_f1_predicted_target =/= 0.U, "f1_predicted_target is 0\n")
+    // assert(n_f1_predicted_target =/= 0.U, "f1_predicted_target is 0\n")
     s0_ghist     := n_f1_predicted_ghist
     s0_is_replay := false.B
 
-    if(enableF1RedirectInfoPrint || enableWatchPC){
-      val printCond = s1_valid
-      val watchCond = s1_valid && s1_vpc === watchPC.U
-      val cond = if(enableF1RedirectInfoPrint) printCond else watchCond
-      XSDebug(cond, "-----------------F1 NPC Info-----------------\n")
-      XSDebug(cond, p"PC: 0x${Hexadecimal(s1_vpc)}\n")
-      XSDebug(cond, p"do_redirect: ${n_f1_do_redirect} cfiIndex: ${n_f1_redirect_idx} NPC: 0x${Hexadecimal(n_f1_predicted_target)}\n")
-      n_s1_bpd_resp.pred.display(cond && n_f1_do_redirect)
-      XSDebug(cond, "---------------------------------------------\n")
-    }
+    // if(enableF1RedirectInfoPrint || enableWatchPC){
+    //   val printCond = s1_valid
+    //   val watchCond = s1_valid && s1_vpc === watchPC.U
+    //   val cond = if(enableF1RedirectInfoPrint) printCond else watchCond
+    //   XSDebug(cond, "-----------------F1 NPC Info-----------------\n")
+    //   XSDebug(cond, p"PC: 0x${Hexadecimal(s1_vpc)}\n")
+    //   XSDebug(cond, p"do_redirect: ${n_f1_do_redirect} cfiIndex: ${n_f1_redirect_idx} NPC: 0x${Hexadecimal(n_f1_predicted_target)}\n")
+    //   n_s1_bpd_resp.pred.display(cond && n_f1_do_redirect)
+    //   XSDebug(cond, "---------------------------------------------\n")
+    // }
 
   }
 

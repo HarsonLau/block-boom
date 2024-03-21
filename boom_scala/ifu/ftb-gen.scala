@@ -94,7 +94,10 @@ class FTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBPara
   when (entry_has_jmp) {
     init_entry.tailSlot.offset := pd.jmpOffset
     init_entry.tailSlot.valid := new_jmp_is_jal || new_jmp_is_jalr
-    init_entry.tailSlot.setLowerStatByTarget(io.start_addr, Mux(cfi_is_jalr, io.target, pd.jalTarget), isShare=false)
+    init_entry.tailSlot.setLowerStatByTarget(io.start_addr, Mux(cfi_is_jalr, 
+      Mux(io.target === 0.U, nextFetch(io.start_addr), io.target),
+      pd.jalTarget),
+    isShare=false)
     val recordedTarget = init_entry.tailSlot.getTarget(io.start_addr)
     init_entry.needExtend := cfi_is_jalr && !new_jmp_is_ret && recordedTarget =/= io.target
     // assert(init_entry.tailSlot.getTarget(io.start_addr) === Mux(cfi_is_jalr, io.target, pd.jalTarget), "jmp target not match")
@@ -183,7 +186,7 @@ class FTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBPara
   val old_tail_is_jmp = !oe.tailSlot.sharing
   val jalr_target_modified = cfi_is_jalr && (old_target =/= io.target) && old_tail_is_jmp // TODO: pass full jalr target
   when (jalr_target_modified) {
-    old_entry_jmp_target_modified.setByJmpTarget(io.start_addr, io.target)
+    old_entry_jmp_target_modified.setByJmpTarget(io.start_addr, Mux(io.target === 0.U, nextFetch(io.start_addr), io.target))
     old_entry_jmp_target_modified.always_taken := 0.U.asTypeOf(Vec(numBr, Bool()))
     old_entry_jmp_target_modified.br_mask := pd.brMask
     val recordedTarget = old_entry_jmp_target_modified.tailSlot.getTarget(io.start_addr)
