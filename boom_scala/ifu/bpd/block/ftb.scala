@@ -275,7 +275,6 @@ class FTBMeta(implicit p: Parameters) extends BoomBundle with FTBParams {
   val writeWay = UInt(log2Ceil(numWays).W)
   val hit = Bool()
   // val pred_cycle = if (!env.FPGAPlatform) Some(UInt(64.W)) else None
-  val replacer = ReplacementPolicy.fromString("plru", 4)
 }
 
 object FTBMeta {
@@ -316,7 +315,7 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   val ftb = Seq.fill(nWays) {SyncReadMem(nSets, new FTBEntry)}
 
   val ebtb     = SyncReadMem(extendedNSets, UInt(vaddrBitsExtended.W))
-  val replacer = new SetAssocLRU(numSets, numWays, "plru")
+  // val replacer = new SetAssocLRU(numSets, numWays, "plru")
 
   val mems = (((0 until nWays) map ({w:Int => Seq(
     (f"ftb_tag_way$w", nSets, tagSize),
@@ -401,44 +400,39 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   // Select the update allocate way
   // Selection logic:
   //    1. if any entries within the same index is not valid, select it
-  //    2. if all entries is valid, use replacer
-  def alloc_way(valids: UInt, idx: UInt): UInt = {
-    if (numWays > 1) {
-      val w = Wire(UInt(log2Up(numWays).W))
-      val valid = WireInit(valids.andR)
-      w := Mux(valid, replacer.way(idx), PriorityEncoder(~valids))
-      w
-    } else {
-      val w = WireInit(0.U(log2Up(numWays).W))
-      w
+  //    2. if all entries is valid, use random
+  val alloc_way = if (nWays > 1) {
+    val r_metas = Cat(u_s1_req_rtag.asUInt, u_s1_tag(tagSize - 1, 0))
+
+    val l = log2Ceil(nWays)
+    val nChunks = (r_metas.getWidth + l - 1) / l
+    val chunks = (0 until nChunks) map { i =>
+      r_metas(min((i+1)*l, r_metas.getWidth)-1, i*l)
     }
+
+    val valids = u_s1_req_valids.asUInt
+    val valid = valids.andR
+    
+    val w = Wire(UInt(log2Ceil(numWays).W))
+    w := Mux(valid, chunks.reduce(_^_), PriorityEncoder(~valids))
+
+    w
+  } else {
+    0.U
   }
+
   val u_s1_write_way = Mux(u_s1_meta.hit,
     u_s1_meta.writeWay,
-    Mux(u_s1_hit, u_s1_hit_way, alloc_way(u_s1_req_valids.asUInt, u_s1_idx))
+    Mux(u_s1_hit, u_s1_hit_way, alloc_way)
    )
 
-  val touch_set = Seq.fill(1)(Wire(UInt(log2Ceil(numSets).W)))
-  val touch_way = Seq.fill(1)(Wire(Valid(UInt(log2Ceil(numWays).W))))
 
   val write_set = Wire(UInt(log2Ceil(numSets).W))
   val write_way = Wire(Valid(UInt(log2Ceil(numWays).W)))
 
-  val read_set = Wire(UInt(log2Ceil(numSets).W))
-  val read_way = Wire(Valid(UInt(log2Ceil(numWays).W)))
-  read_set := s1_req_ridx
-  read_way.valid := s1_hit
-  read_way.bits  := s1_hit_way
-
   write_set := u_s1_idx
   write_way.valid := u_s1_valid
   write_way.bits := u_s1_write_way
-
-  touch_set(0) := Mux(write_way.valid, write_set, read_set)
-  touch_way(0).valid := write_way.valid// || read_way.valid
-  touch_way(0).bits := Mux(write_way.valid, write_way.bits, read_way.bits)
-
-  replacer.access(touch_set, touch_way)
 
   // --------------------------------------------------------
   // **** (S2) ****
