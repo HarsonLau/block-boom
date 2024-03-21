@@ -44,7 +44,7 @@ case class BoomCoreParams(
   enableFastPNR: Boolean = false,
   enableSFBOpt: Boolean = false,
   enableGHistStallRepair: Boolean = true,
-  enableBTBFastRepair: Boolean = true,
+  enableBTBFastRepair: Boolean = false,
   useAtomicsOnlyForIO: Boolean = false,
   ftq: FtqParameters = FtqParameters(),
   intToFpLatency: Int = 2,
