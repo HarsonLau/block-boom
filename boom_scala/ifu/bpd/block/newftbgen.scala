@@ -8,7 +8,6 @@ import freechips.rocketchip.config.{Parameters}
 import boom.common._
 import boom.exu._
 import boom.util._
-import scala.CanEqual.derived
 
 class PredecodeFTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomFTBParameters {
   val io = IO(new Bundle {
@@ -73,7 +72,8 @@ class CommitFTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomF
     val cfiIndex = Flipped(Valid(UInt(log2Ceil(predictWidth).W)))
     val cfiTaken = Input(Bool())
     val old_entry = Input(new FTBEntry)
-    val cfi_type  = Input(UInt(CFI_SZ.W))
+    val cfi_is_br = Input(Bool())
+    val cfi_is_jalr = Input(Bool())
     val new_entry = Output(new FTBEntry)
     val taken_mask = Output(Vec(numBr, Bool()))
   })
@@ -84,7 +84,7 @@ class CommitFTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomF
   // --------------------------------------------------------
   
   val init_entry = WireInit(0.U.asTypeOf(new FTBEntry))
-  val cfi_is_br = io.cfiIndex.valid && io.cfi_type === CFI_BR
+  val cfi_is_br = io.cfiIndex.valid && io.cfi_is_br
   when (cfi_is_br) {
     init_entry.valid := true.B
     init_entry.getSlotForBr(0).valid := true.B
@@ -94,6 +94,15 @@ class CommitFTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomF
     init_entry.needExtend := false.B
   }
 
+  def carryPos = log2Ceil(predictWidth)+instOffsetBits
+  def getLower(pc: UInt) = pc(carryPos-1, instOffsetBits)
+  val defaultPft = Mux(isLastBankInBlock(io.start_addr), 4.U, 0.U) // when nBanks === 1 , isLastBankInBlock is always false
+  val defaultCarry = Mux(isLastBankInBlock(io.start_addr), false.B, true.B)
+  init_entry.pftAddr := defaultPft
+  init_entry.carry   := defaultCarry
+  init_entry.isJalr := false.B
+  init_entry.isCall := false.B
+  init_entry.isRet  := false.B
   // --------------------------------------------------------
   // **** Insert new Br ****
   // --------------------------------------------------------
@@ -165,7 +174,7 @@ class CommitFTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomF
   // --------------------------------------------------------
   // **** Modify Jalr Target ****
   // --------------------------------------------------------
-  val cfi_is_jalr =io.cfiIndex.valid && io.cfiIndex.bits === oe.tailSlot.offset && io.cfi_type === CFI_JALR && oe.tailSlot.valid && oe.isJalr
+  val cfi_is_jalr =io.cfiIndex.valid && io.cfiIndex.bits === oe.tailSlot.offset && io.cfi_is_jalr && oe.tailSlot.valid && oe.isJalr
   val old_entry_jmp_target_modified = WireInit(oe)
   val old_target = oe.tailSlot.getTarget(io.start_addr) // may be wrong because we store only 20 lowest bits
   val old_tail_is_jmp = !oe.tailSlot.sharing

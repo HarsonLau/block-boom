@@ -1353,6 +1353,22 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     assert(!bp_update.cfi_is_jal || bp_update.cfi_idx.bits === bp_update.pd.jmpOffset, "cfi_is_jal is true but cfi_idx is not equal to jmpOffset")
   }
 
+  val pdGen = Module(new PredecodeFTBEntryGen).io
+  pdGen.start_addr := bpd_update_arbiter.io.out.bits.pc
+  pdGen.old_entry := bpd_update_arbiter.io.out.bits.ftb_entry
+  pdGen.pd := bpd_update_arbiter.io.out.bits.pd
+  pdGen.cfiIndex := bpd_update_arbiter.io.out.bits.cfi_idx
+  pdGen.target := bpd_update_arbiter.io.out.bits.target
+
+  val commitGen = Module(new CommitFTBEntryGen).io
+  commitGen.start_addr := bpd_update_arbiter.io.out.bits.pc
+  commitGen.target := bpd_update_arbiter.io.out.bits.target
+  commitGen.cfiIndex := bpd_update_arbiter.io.out.bits.cfi_idx
+  commitGen.cfiTaken := bpd_update_arbiter.io.out.bits.cfi_taken
+  commitGen.old_entry := bpd_update_arbiter.io.out.bits.ftb_entry
+  commitGen.cfi_is_br := bpd_update_arbiter.io.out.bits.cfi_is_br
+  commitGen.cfi_is_jalr := bpd_update_arbiter.io.out.bits.cfi_is_jalr
+
   val ftbEntryGen = Module(new FTBEntryGen).io
   ftbEntryGen.start_addr := bpd_update_arbiter.io.out.bits.pc
   ftbEntryGen.old_entry := bpd_update_arbiter.io.out.bits.ftb_entry
@@ -1378,9 +1394,11 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   ftbEntryGen.is_always_taken_modified := DontCare
   ftbEntryGen.is_br_full := DontCare
 
-  io.cpu.ftb_entry_overflow := ftbEntryGen.is_br_full
+  io.cpu.ftb_entry_overflow := DontCare
 
-  val out_entry = ftbEntryGen.new_entry
+  val is_btb_misp = bpd_update_arbiter.io.out.bits.btb_mispredicts.orR
+  val new_jmp = bpd_update_arbiter.io.out.bits.pd.jmpInfo.valid
+  val out_entry = Mux(is_btb_misp || new_jmp, pdGen.new_entry, commitGen.new_entry)
   if(enableF4FTBGenIOPrint || enableWatchPC){
     val cond = if(enableF4FTBGenIOPrint) bpd_update_arbiter.io.out.bits.cfi_idx.valid else bpd_update_arbiter.io.out.bits.pc === watchPC.asUInt
     XSDebug(cond, p"--------------------ftbEntryGen out entry--------------------\n")
@@ -1394,23 +1412,15 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   nbpd.io.update.valid := bpd_update_arbiter.io.out.valid
   nbpd.io.update.bits := bpd_update_arbiter.io.out.bits
   nbpd.io.update.bits.ftb_entry := out_entry
-  nbpd.io.update.bits.br_taken_mask := ftbEntryGen.taken_mask
-  // nbpd.io.update.bits.is_mispredict_update := bpd_update_arbiter.io.out.bits.is_mispredict_update
-  // nbpd.io.update.bits.is_repair_update := bpd_update_arbiter.io.out.bits.is_repair_update
-  // nbpd.io.update.bits.btb_mispredicts := bpd_update_arbiter.io.out.bits.btb_mispredicts
-  // nbpd.io.update.bits.pc := bpd_update_arbiter.io.out.bits.pc
-  // nbpd.io.update.bits.br_mask := bpd_update_arbiter.io.out.bits.br_mask
-  // nbpd.io.update.bits.cfi_idx := bpd_update_arbiter.io.out.bits.cfi_idx
-  // nbpd.io.update.bits.cfi_taken := bpd_update_arbiter.io.out.bits.cfi_taken
-  // nbpd.io.update.bits.cfi_mispredicted := bpd_update_arbiter.io.out.bits.cfi_mispredicted
-  // nbpd.io.update.bits.cfi_is_br := bpd_update_arbiter.io.out.bits.cfi_is_br
-  // nbpd.io.update.bits.cfi_is_jal := bpd_update_arbiter.io.out.bits.cfi_is_jal
-  // nbpd.io.update.bits.cfi_is_jalr := bpd_update_arbiter.io.out.bits.cfi_is_jalr
-  // nbpd.io.update.bits.ghist := bpd_update_arbiter.io.out.bits.ghist
-  // nbpd.io.update.bits.lhist := bpd_update_arbiter.io.out.bits.lhist(0)
-  // nbpd.io.update.bits.target := bpd_update_arbiter.io.out.bits.target
-  // nbpd.io.update.bits.meta := bpd_update_arbiter.io.out.bits.meta(0)
-  // nbpd.io.update.bits.pd := bpd_update_arbiter.io.out.bits.pd
+  nbpd.io.update.bits.br_taken_mask := commitGen.taken_mask
+
+  when(out_entry.asUInt =/= ftbEntryGen.new_entry.asUInt){
+    bpd_update_arbiter.io.out.bits.display(true.B)
+    XSDebug(true.B, p"FTBEntryGen: old entry: 0x${Hexadecimal(out_entry.asUInt)}\n")
+    out_entry.display(true.B)
+    XSDebug(true.B, p"FTBEntryGen: new entry: \n")
+    ftbEntryGen.new_entry.display(true.B)
+  }
 
   if(enablePCTracePrint){
     val cond = true.B
