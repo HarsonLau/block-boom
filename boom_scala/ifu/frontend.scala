@@ -577,9 +577,6 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
 
   // Queue up the bpd resp as well, incase f4 backpressures f3
   // This is "flow" because the response (enq) arrives in f3, not f2
-  // val f3_bpd_resp = withReset(reset.asBool || f3_clear) {
-  //   Module(new Queue(new BranchPredictionBundle, 1, pipe=true, flow=true)) }
-
   val n_f3_bpd_resp = withReset(reset.asBool || f3_clear) {
     Module(new Queue(new BlockPredictionBundle, 1, pipe=true, flow=true)) }
   
@@ -610,14 +607,9 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
 
 
   // The BPD resp comes in f3
-  // f3_bpd_resp.io.enq.valid := f3.io.deq.valid && RegNext(f3.io.enq.ready)
   n_f3_bpd_resp.io.enq.valid := f3.io.deq.valid && RegNext(f3.io.enq.ready) // FTB
-  // f3_bpd_resp.io.enq.bits  := bpd.io.resp.f3
   n_f3_bpd_resp.io.enq.bits := nbpd.io.resp.f3 // FTB
   assert(nbpd.io.resp.f3.pred.blockMask.asUInt =/= 0.U, "nbpd f3 blockMask is zero") // FTB
-  // when (f3_bpd_resp.io.enq.fire()) {
-  //   bpd.io.f3_fire := true.B
-  // }
   n_f3_ftb_entry.io.enq.valid := f3.io.deq.valid && RegNext(f3.io.enq.ready) // FTB
   n_f3_ftb_entry.io.enq.bits := nbpd.io.resp.last_stage_entry
 
@@ -626,7 +618,6 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   }
 
   f3.io.deq.ready := f4_ready
-  // f3_bpd_resp.io.deq.ready := f4_ready
   n_f3_bpd_resp.io.deq.ready := f4_ready // FTB
   n_f3_ftb_entry.io.deq.ready := f4_ready // FTB
 
@@ -780,11 +771,9 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
       assert(f3_block_mask.asUInt =/= 0.U) // FTB
       bank_mask(w) := f3.io.deq.valid && f3_imemresp.mask(i) && valid && !redirect_found //&& f3_block_mask(i) // FTB
       f3_mask  (i) := f3.io.deq.valid && f3_imemresp.mask(i) && valid && !redirect_found //&& f3_block_mask(i) // FTB
-      // bank_mask(w) := f3.io.deq.valid && f3_imemresp.mask(i) && valid && !redirect_found
-      // f3_mask  (i) := f3.io.deq.valid && f3_imemresp.mask(i) && valid && !redirect_found
       val bpd_predicted_target = n_f3_bpd_resp.io.deq.bits.pred.getTarget(i.asUInt, n_f3_bpd_resp.io.deq.bits.pc) // FTB
       val bpd_predicted_jalr_target = n_f3_bpd_resp.io.deq.bits.pred.jalr_target
-      WarnAssert(bpd_predicted_target =/= 0.U, "bpd_predicted_target is 0\n")
+      // WarnAssert(bpd_predicted_target =/= 0.U, "bpd_predicted_target is 0\n")
       f3_targs (i) := Mux(brsigs.cfi_type === CFI_JALR,
         Mux(bpd_predicted_jalr_target.valid, bpd_predicted_jalr_target.bits, bpd_predicted_target), // TODO: fixme for unrecorded JALR
         brsigs.target)
@@ -802,16 +791,8 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
         n_f3_bpd_resp.io.deq.bits.pred.validPredict(i.asUInt)&& // Note: In the original implemenation, this is not commented out
         n_f3_bpd_resp.io.deq.bits.pred.getTarget(i.asUInt, n_f3_bpd_resp.io.deq.bits.pc) =/= brsigs.target
       )
-      // // Flush BTB entries for JALs if we mispredict the target
-      // f3_btb_mispredicts(i) := (f3_mask(i) && brsigs.cfi_type === CFI_JAL && // FTB
-      //   // n_f3_bpd_resp.io.deq.bits.pred.validPredict(i.asUInt)&& // Note: In the original implemenation, this is not commented out
-      //   // But if the BTB doesn't provide the target, which means it fails to identify the inst as a JAL,
-      //   // so we should fire up an insertion to BTB
-      //   (n_f3_bpd_resp.io.deq.bits.pred.getTarget(i.asUInt, n_f3_bpd_resp.io.deq.bits.pc) =/= brsigs.target)
-      // )
 
       f3_btb_mispredicts(i) := jalTargetMispredicted || takenBrTargetMispredicted
-
 
       f3_npc_plus4_mask(i) := (if (w == 0) {
         !f3_is_rvc(i) && !bank_prev_is_half
@@ -845,7 +826,6 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
       f3_redirects(i)    := f3_mask(i) && (
         brsigs.cfi_type === CFI_JAL || brsigs.cfi_type === CFI_JALR ||
         (brsigs.cfi_type === CFI_BR && n_f3_bpd_resp.io.deq.bits.pred.is_taken(i.asUInt) && useBPD.B)
-        // (brsigs.cfi_type === CFI_BR && f3_bpd_resp.io.deq.bits.preds(i).taken && useBPD.B)
       )
       // TODO: check this in new BPD
 
@@ -868,27 +848,6 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
       bank_prev_half)
   }
 
-  // for FTB
-  if(enableWatchPC && enableF3MaskPrint){
-    val cond = f3_fetch_bundle.pc === watchPC.asUInt
-    XSDebug(cond,p"-----F3 masks Watch PC: ${Hexadecimal(watchPC.asUInt)}: ${watchPC.asUInt}-----\n")
-    // print all the masks in binary
-    // f3_mask 
-    XSDebug(cond, p"f3_fetch_bundle.mask: ${Binary(f3_fetch_bundle.mask.asUInt)}\n")
-    XSDebug(cond, p"f3_fetch_bundle.br_mask: ${Binary(f3_fetch_bundle.br_mask.asUInt)}\n")
-    XSDebug(cond, p"f3_redirects: ${Binary(f3_redirects.asUInt)}\n")
-    XSDebug(cond, p"f3_fetch_bundle.cfi_idx: ${f3_fetch_bundle.cfi_idx}\n")
-    XSDebug(cond, p"n_f3_bpd_resp.io.deq.bits.pred.blockMask: ${Binary(n_f3_bpd_resp.io.deq.bits.pred.blockMask.asUInt)}\n")
-    for (i <- 0 until fetchWidth) {
-      val cond_CFI_JAL = f3_cfi_types(i) === CFI_JAL
-      val cond_CFI_JALR = f3_cfi_types(i) === CFI_JALR
-      val cond_CFI_BR = f3_cfi_types(i) === CFI_BR
-      XSDebug(cond && cond_CFI_JAL, p"f3_cfi_types ${i}: CFI_JAL\n")
-      XSDebug(cond && cond_CFI_JALR, p"f3_cfi_types ${i}: CFI_JALR\n")
-      XSDebug(cond && cond_CFI_BR, p"f3_cfi_types ${i}: CFI_BR\n")
-    }
-    XSDebug(cond, p"-------------------------\n")
-  }
 
   val f3_jmp_mask = f3_mask.asUInt & f3_cfi_types.map(t => t === CFI_JAL || t === CFI_JALR).asUInt 
   val f3_jmp_idx = PriorityEncoder(f3_jmp_mask)
@@ -917,7 +876,6 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     f3_prev_is_half := bank_prev_is_half
     f3_prev_half    := bank_prev_half
     assert(n_f3_bpd_resp.io.deq.bits.pc === f3_fetch_bundle.pc)
-    // assert(f3_bpd_resp.io.deq.bits.pc === f3_fetch_bundle.pc)
   }
 
   when (f3_clear) {
@@ -937,10 +895,6 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
       f3_targs(PriorityEncoder(f3_redirects))
     ),
     nextFetch(f3_fetch_bundle.pc) // TODO: use nextFetch or fallThru addr?
-    // Mux(n_f3_bpd_resp.io.deq.bits.pred.hit,
-    // n_f3_bpd_resp.io.deq.bits.pred.fallThroughAddr,
-    // nextFetch(f3_fetch_bundle.pc)
-    // )
   )
 
   f3_fetch_bundle.next_pc       := f3_predicted_target
@@ -956,29 +910,10 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   )
   f3_fetch_bundle.br_mask := f3_br_mask.asUInt & f3_mask.asUInt // branches
 
-  if(enableWatchPC){
-    val cond = f3_fetch_bundle.pc === watchPC.asUInt
-
-    val f3_ghist_branches = f3_fetch_bundle.br_mask
-    val f3_ghist_cfi_taken = f3_fetch_bundle.cfi_idx.valid
-    val f3_ghist_cfi_is_br = f3_fetch_bundle.br_mask(f3_fetch_bundle.cfi_idx.bits)
-    val f3_ghist_cfi_idx = f3_fetch_bundle.cfi_idx.bits
-    val f3_ghist_cfi_valid = f3_fetch_bundle.cfi_idx.valid
-    val f3_ghist_addr = f3_fetch_bundle.pc
-    val f3_ghist_is_call = f3_fetch_bundle.cfi_is_call
-    val f3_ghist_is_ret = f3_fetch_bundle.cfi_is_ret
-
-    XSDebug(cond, "-----------------F3 GHist Info-----------------\n")
-    XSDebug(cond, p"branches: ${Binary(f3_ghist_branches.asUInt)}, cfi_taken: ${f3_ghist_cfi_taken}, cfi_is_br: ${f3_ghist_cfi_is_br}, cfi_idx: ${f3_ghist_cfi_idx}, cfi_valid: ${f3_ghist_cfi_valid}, addr: 0x${Hexadecimal(f3_ghist_addr)}, is_call: ${f3_ghist_is_call}, is_ret: ${f3_ghist_is_ret}\n")
-    XSDebug(cond, "-----------------------------------------------\n")
-  }
-
-
   ras.io.write_valid := false.B
   ras.io.write_addr  := f3_aligned_pc + (f3_fetch_bundle.cfi_idx.bits << 1) + Mux(
     f3_fetch_bundle.cfi_npc_plus4, 4.U, 2.U)
   ras.io.write_idx   := WrapInc(f3_fetch_bundle.ghist.ras_idx, nRasEntries)
-
 
   val f3_correct_f1_ghist = s1_ghist =/= f3_predicted_ghist && enableGHistStallRepair.B
   val f3_correct_f2_ghist = s2_ghist =/= f3_predicted_ghist && enableGHistStallRepair.B
@@ -1007,25 +942,8 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
       s0_tsrc      := BSRC_3
 
       f3_fetch_bundle.fsrc := BSRC_3
-      if(enableF3RedirectInfoPrint || enableWatchPC){
-        val printCond = f3_redirects.reduce(_||_)
-        val watchCond = f3_fetch_bundle.pc === watchPC.asUInt
-        val cond = if(enableWatchPC) watchCond else printCond
-        XSDebug(cond, "-----------------F3 NPC Info-----------------\n")
-        XSDebug(cond, p"PC: 0x${Hexadecimal(f3_fetch_bundle.pc)}\n")
-        XSDebug(cond, p"s1_vpc: 0x${Hexadecimal(s1_vpc)} s2_vpc: 0x${Hexadecimal(s2_vpc)}, s3_predicted_target: 0x${Hexadecimal(f3_predicted_target)}\n")
-        XSDebug(cond, p"s1_valid: ${s1_valid} s2_valid: ${s2_valid} f3_correct_f2_ghist: ${f3_correct_f2_ghist} f3_correct_f1_ghist: ${f3_correct_f1_ghist}\n")
-        XSDebug(cond, p"do_redirect: ${f3_redirects.reduce(_||_)} cfiIndex: ${f3_fetch_bundle.cfi_idx} NPC: 0x${Hexadecimal(f3_predicted_target)}\n")
-        XSDebug(cond, p"br_mask: ${Binary(f3_fetch_bundle.br_mask.asUInt)}\n")
-        XSDebug(cond, p"cfi_is_br: ${f3_fetch_bundle.br_mask(f3_fetch_bundle.cfi_idx.bits)}\n")
-        XSDebug(cond, p"cfi_is_ret: ${f3_fetch_bundle.cfi_is_ret} cfi_is_call: ${f3_fetch_bundle.cfi_is_call}\n")
-        n_f3_bpd_resp.io.deq.bits.pred.display(cond)
-        XSDebug(cond, "---------------------------------------------\n")
-      }
     }
   }
-
-  assert(!(f3.io.deq.valid && f4_ready) || f3_predicted_target =/= 0.U, "f3_predicted_target should not be zero")
 
   // When f3 finds a btb mispredict, queue up a bpd correction update
   val f4_btb_corrections = Module(new Queue(new BlockUpdate, 2)) // TODO: add FTB support here
@@ -1048,41 +966,6 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   f4_btb_corrections.io.enq.bits.ftb_entry            := f3_fetch_bundle.ftb_entry
   f4_btb_corrections.io.enq.bits.cfi_taken            := false.B
   f4_btb_corrections.io.enq.bits.cfi_mispredicted     := false.B
-
-  when(f4_btb_corrections.io.enq.valid){
-    assert(f4_btb_corrections.io.enq.bits.cfi_idx.valid, "when f4_btb_corrections.io.enq.valid, cfi_idx should be valid")
-    assert(f4_btb_corrections.io.enq.bits.cfi_idx.bits < fetchWidth.U, "when f4_btb_corrections.io.enq.valid, cfi_idx should be less than fetchWidth")
-    assert(!f4_btb_corrections.io.enq.bits.cfi_is_jal || f4_btb_corrections.io.enq.bits.pd.jmpInfo.valid, "when correct jal target, jmpInfo should be valid")
-    assert(!f4_btb_corrections.io.enq.bits.cfi_is_jal || f4_btb_corrections.io.enq.bits.pd.jmpOffset < fetchWidth.U, "when f4_btb_corrections.io.enq.valid, jmpOffset should be less than fetchWidth")
-    assert(!f4_btb_corrections.io.enq.bits.cfi_is_jal || f4_btb_corrections.io.enq.bits.pd.jmpOffset === f4_btb_corrections.io.enq.bits.cfi_idx.bits, "when f4_btb_corrections.io.enq.valid, jmpOffset should be equal to cfi_idx")
-    // val cond = f4_btb_corrections.io.enq.bits.pd.jmpOffset =/= f4_btb_corrections.io.enq.bits.cfi_idx.bits
-    // XSDebug(cond, "when f4_btb_corrections.io.enq.valid, jmpOffset should be equal to cfi_idx\n")
-    // XSDebug(cond, p"jmpOffset: ${f4_btb_corrections.io.enq.bits.pd.jmpOffset} cfi_idx: ${f4_btb_corrections.io.enq.bits.cfi_idx.bits}\n")
-    // XSDebug(cond, p"pc: 0x${Hexadecimal(f4_btb_corrections.io.enq.bits.pc)}\n")
-    // XSDebug(cond, p"f3_fetch_bundle.mask: ${Binary(f3_fetch_bundle.mask.asUInt)}\n")
-    // XSDebug(cond, p"f3_fetch_bundle.br_mask: ${Binary(f3_fetch_bundle.br_mask.asUInt)}\n")
-    // XSDebug(cond, p"f3_redirects: ${Binary(f3_redirects.asUInt)}, f3_redirects priority encode ${PriorityEncoder(f3_redirects.asUInt)}\n")
-    // XSDebug(cond, p"n_f3_bpd_resp.io.deq.bits.pred.blockMask: ${Binary(n_f3_bpd_resp.io.deq.bits.pred.blockMask.asUInt)}\n")
-    // for (i <- 0 until fetchWidth) {
-    //   val cond_CFI_JAL = f3_cfi_types(i) === CFI_JAL
-    //   val cond_CFI_JALR = f3_cfi_types(i) === CFI_JALR
-    //   val cond_CFI_BR = f3_cfi_types(i) === CFI_BR
-    //   XSDebug(cond && cond_CFI_JAL, p"f3_cfi_types ${i}: CFI_JAL\n")
-    //   XSDebug(cond && cond_CFI_JALR, p"f3_cfi_types ${i}: CFI_JALR\n")
-    //   XSDebug(cond && cond_CFI_BR, p"f3_cfi_types ${i}: CFI_BR\n")
-    // }
-    assert(!f4_btb_corrections.io.enq.bits.cfi_is_jal || f4_btb_corrections.io.enq.bits.pd.hasJal, "when f4_btb_corrections.io.enq.valid, the predecode info should have jal")
-  }
-
-  if(enableF4BTBCorrectionInputPrint || enableWatchPC){
-    val printCond = f4_btb_corrections.io.enq.valid
-    val watchCond = f4_btb_corrections.io.enq.valid && f4_btb_corrections.io.enq.bits.pc === watchPC.asUInt
-    val cond = if(enableWatchPC) watchCond else printCond
-    XSDebug(cond, "--------------------f4_btb_corrections.io.enq--------------------\n")
-    f4_btb_corrections.io.enq.bits.display(cond, if(enableWatchPC)false else true)
-    XSDebug(cond, "-----------------------------------------------------------------\n")
-  }
-
 
   // -------------------------------------------------------
   // **** F4 ****
@@ -1182,29 +1065,12 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   bpd_update_arbiter.io.in(0).bits  := ftq.io.bpdupdate.bits
   assert(bpd_update_arbiter.io.in(0).ready)
   bpd_update_arbiter.io.in(1) <> f4_btb_corrections.io.deq
-  // nbpd.io.update := bpd_update_arbiter.io.out
   bpd_update_arbiter.io.out.ready := true.B
 
   when (ftq.io.ras_update && enableRasTopRepair.B) {
     ras.io.write_valid := true.B
     ras.io.write_idx   := ftq.io.ras_update_idx
     ras.io.write_addr  := ftq.io.ras_update_pc
-  }
-
-  if(enableF4FTBGenIOPrint || enableWatchPC){
-    val cond = if(enableF4FTBGenIOPrint) bpd_update_arbiter.io.out.bits.cfi_idx.valid else bpd_update_arbiter.io.out.bits.pc === watchPC.asUInt
-    XSDebug(cond, "--------------------bpd_update_arbiter.io.out--------------------\n")
-    bpd_update_arbiter.io.out.bits.ftb_entry.display(cond, false)
-    bpd_update_arbiter.io.out.bits.display(cond)
-    XSDebug(cond, "-----------------------------------------------------------------\n")
-  }
-
-  when(bpd_update_arbiter.io.out.bits.cfi_idx.valid){
-    val bp_update = bpd_update_arbiter.io.out.bits
-    assert(bp_update.cfi_idx.bits < fetchWidth.U, "cfi_idx is larger than fetchWidth")
-    assert(!bp_update.cfi_is_br || bp_update.pd.brMask(bp_update.cfi_idx.bits), "cfi_is_br is true but brMask is false")
-    assert(!bp_update.cfi_is_jal || bp_update.pd.jmpInfo.valid, "cfi_is_jal is true but jmpInfo is invalid")
-    assert(!bp_update.cfi_is_jal || bp_update.cfi_idx.bits === bp_update.pd.jmpOffset, "cfi_is_jal is true but cfi_idx is not equal to jmpOffset")
   }
 
   val ftbEntryGen = Module(new FTBEntryGen).io
@@ -1235,44 +1101,11 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   io.cpu.ftb_entry_overflow := ftbEntryGen.is_br_full
 
   val out_entry = ftbEntryGen.new_entry
-  if(enableF4FTBGenIOPrint || enableWatchPC){
-    val cond = if(enableF4FTBGenIOPrint) bpd_update_arbiter.io.out.bits.cfi_idx.valid else bpd_update_arbiter.io.out.bits.pc === watchPC.asUInt
-    XSDebug(cond, p"--------------------ftbEntryGen out entry--------------------\n")
-    out_entry.display(cond)
-    XSDebug(cond, p"-------------------------------------------------------------\n")
-  }
-
-  // XSDebug(ftbEntryGen.cfiIndex.valid, p"fall thru: ${Hexadecimal(out_entry.getFallThrough(bpd_update_arbiter.io.out.bits.pc))}\n")
-  // XSDebug(ftbEntryGen.cfiIndex.valid, p"FTBEntry: fall-thru: ${out_entry.getFallThrough(bpd_update_arbiter.io.out.bits.pc)}\n")
 
   nbpd.io.update.valid := bpd_update_arbiter.io.out.valid
   nbpd.io.update.bits := bpd_update_arbiter.io.out.bits
   nbpd.io.update.bits.ftb_entry := out_entry
   nbpd.io.update.bits.br_taken_mask := ftbEntryGen.taken_mask
-  // nbpd.io.update.bits.is_mispredict_update := bpd_update_arbiter.io.out.bits.is_mispredict_update
-  // nbpd.io.update.bits.is_repair_update := bpd_update_arbiter.io.out.bits.is_repair_update
-  // nbpd.io.update.bits.btb_mispredicts := bpd_update_arbiter.io.out.bits.btb_mispredicts
-  // nbpd.io.update.bits.pc := bpd_update_arbiter.io.out.bits.pc
-  // nbpd.io.update.bits.br_mask := bpd_update_arbiter.io.out.bits.br_mask
-  // nbpd.io.update.bits.cfi_idx := bpd_update_arbiter.io.out.bits.cfi_idx
-  // nbpd.io.update.bits.cfi_taken := bpd_update_arbiter.io.out.bits.cfi_taken
-  // nbpd.io.update.bits.cfi_mispredicted := bpd_update_arbiter.io.out.bits.cfi_mispredicted
-  // nbpd.io.update.bits.cfi_is_br := bpd_update_arbiter.io.out.bits.cfi_is_br
-  // nbpd.io.update.bits.cfi_is_jal := bpd_update_arbiter.io.out.bits.cfi_is_jal
-  // nbpd.io.update.bits.cfi_is_jalr := bpd_update_arbiter.io.out.bits.cfi_is_jalr
-  // nbpd.io.update.bits.ghist := bpd_update_arbiter.io.out.bits.ghist
-  // nbpd.io.update.bits.lhist := bpd_update_arbiter.io.out.bits.lhist(0)
-  // nbpd.io.update.bits.target := bpd_update_arbiter.io.out.bits.target
-  // nbpd.io.update.bits.meta := bpd_update_arbiter.io.out.bits.meta(0)
-  // nbpd.io.update.bits.pd := bpd_update_arbiter.io.out.bits.pd
-
-  if(enablePCTracePrint){
-    val cond = true.B
-    XSDebug(cond, p"--------------------PC Trace Cycle: ${debug_cycle}--------------------\n")
-    XSDebug(cond, p"s0_pc: 0x${Hexadecimal(s0_vpc)}, s1_pc: 0x${Hexadecimal(s1_vpc)}, s2_pc: 0x${Hexadecimal(s2_vpc)}, s3_pc: 0x${Hexadecimal(f3_imemresp.pc)}, ftq_pc: 0x${Hexadecimal(ftq.io.enq.bits.pc)}\n")
-    XSDebug(cond, p"s0_valid: ${s0_valid}, s1_valid: ${s1_valid}, s2_valid: ${s2_valid}, s3_valid: ${f3.io.deq.valid}, ftq_valid: ${ftq.io.enq.valid}\n")
-    XSDebug(cond, p"----------------------------------------------------------------------\n")
-  }
 
   // -------------------------------------------------------
   // **** To Core (F5) ****
