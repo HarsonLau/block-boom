@@ -501,9 +501,6 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   // **** ICache Response (F2) ****
   // --------------------------------------------------------
 
-  /* for debug */
-  val previous_bpd_resp = RegNext(n_s1_bpd_resp)
-
   val s2_valid = RegNext(s1_valid && !f1_clear, false.B)
   val s2_vpc   = RegNext(s1_vpc)
   val s2_ghist = Reg(new GlobalHistory)
@@ -520,37 +517,15 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
 
   icache.io.s2_kill := s2_xcpt
 
-  // val f2_bpd_resp = bpd.io.resp.f2
   val n_f2_bpd_resp = nbpd.io.resp.f2
   val f2_mask = fetchMask(s2_vpc)
-  // val f2_redirects = (0 until fetchWidth) map { i =>
-  //   s2_valid && f2_mask(i) && f2_bpd_resp.preds(i).predicted_pc.valid &&
-  //   (f2_bpd_resp.preds(i).is_jal ||
-  //     (f2_bpd_resp.preds(i).is_br && f2_bpd_resp.preds(i).taken))
-  // }
-  // val f2_redirect_idx = PriorityEncoder(f2_redirects)
   val n_f2_redirect_idx = n_f2_bpd_resp.pred.cfiIndex.bits // FTB
-  // val f2_targs = f2_bpd_resp.preds.map(_.predicted_pc.bits)
-  // val f2_do_redirect = f2_redirects.reduce(_||_) && useBPD.B
   val n_f2_do_redirect = n_f2_bpd_resp.pred.cfiIndex.valid && useBPD.B // FTB
-  // val f2_predicted_target = Mux(f2_do_redirect,
-  //                               f2_targs(f2_redirect_idx),
-  //                               nextFetch(s2_vpc))
   val n_f2_predicted_target = Mux(n_f2_bpd_resp.pred.hit_taken_on_jalr && n_f2_bpd_resp.pred.jalr_target.valid,
    n_f2_bpd_resp.pred.jalr_target.bits,
    n_f2_bpd_resp.pred.target(n_f2_bpd_resp.pc)
   ) // FTB
-  WarnAssert(!s2_valid || n_f2_predicted_target =/= 0.U, "f2_predicted_target is 0\n")
 
-  // val f2_predicted_ghist = s2_ghist.update(
-  //   f2_bpd_resp.preds.map(p => p.is_br && p.predicted_pc.valid).asUInt & f2_mask,
-  //   f2_bpd_resp.preds(f2_redirect_idx).taken && f2_do_redirect,
-  //   f2_bpd_resp.preds(f2_redirect_idx).is_br,
-  //   f2_redirect_idx,
-  //   f2_do_redirect,
-  //   s2_vpc,
-  //   false.B,
-  //   false.B)
   val n_f2_predicted_ghist = s2_ghist.update(
     n_f2_bpd_resp.pred.br_mask.asUInt & f2_mask.asUInt, // branches
     n_f2_bpd_resp.pred.real_slot_taken() && n_f2_do_redirect, // cfi_taken
@@ -561,24 +536,6 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     false.B, // cfi_is_call
     false.B) // cfi_is_ret
 
-  if(enableWatchPC){
-    val f2_ghist_branches = n_f2_bpd_resp.pred.br_mask.asUInt & f2_mask.asUInt
-    val f2_ghist_cfi_taken = n_f2_bpd_resp.pred.real_slot_taken() && n_f2_do_redirect
-    val f2_ghist_cfi_is_br = n_f2_bpd_resp.pred.hit_taken_on_br
-    val f2_ghist_cfi_idx = n_f2_redirect_idx
-    val f2_ghist_cfi_valid = n_f2_do_redirect
-    val f2_ghist_addr = s2_vpc
-    val f2_ghist_is_call = false.B
-    val f2_ghist_is_ret = false.B
-
-    val cond = s2_valid && s2_vpc === watchPC.U
-
-    XSDebug(cond, "-----------------F2 Ghist Info-----------------\n")
-    XSDebug(cond, p"branches: ${Binary(f2_ghist_branches)} cfi_taken: ${f2_ghist_cfi_taken} cfi_is_br: ${f2_ghist_cfi_is_br} cfi_idx: ${f2_ghist_cfi_idx} cfi_valid: ${f2_ghist_cfi_valid} addr: 0x${Hexadecimal(f2_ghist_addr)} is_call: ${f2_ghist_is_call} is_ret: ${f2_ghist_is_ret}\n")
-    XSDebug(cond, "-----------------------------------------------\n")
-  }
-
-  // val f2_correct_f1_ghist = s1_ghist =/= f2_predicted_ghist && enableGHistStallRepair.B
   val n_f2_correct_f1_ghist = s1_ghist =/= n_f2_predicted_ghist && enableGHistStallRepair.B
 
   when ((s2_valid && !icache.io.resp.valid) ||
@@ -597,55 +554,19 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
       s2_ghist := n_f2_predicted_ghist
     }
     when ((s1_valid && (s1_vpc =/= n_f2_predicted_target || n_f2_correct_f1_ghist)) || !s1_valid) {
-      // assert(!s1_valid || s1_vpc === n_f2_predicted_target, "s1_vpc != n_f2_predicted_target")// TODO: remove this after adding F2 predictors
       f1_clear := true.B
 
       s0_valid     := !((s2_tlb_resp.ae.inst || s2_tlb_resp.pf.inst) && !s2_is_replay)
-      assert(n_f2_predicted_target =/= 0.U, "f2_predicted_target is 0\n")
       s0_vpc       := n_f2_predicted_target
       s0_is_replay := false.B
       s0_ghist     := n_f2_predicted_ghist
       s2_fsrc      := BSRC_2
       s0_tsrc      := BSRC_2
-      if(enableF2RedirectInfoPrint){
-        val cond = true.B
-        XSDebug(cond, "-----------------F2 NPC Info-----------------\n")
-        XSDebug(cond, p"PC: 0x${Hexadecimal(s2_vpc)}\n")
-        XSDebug(cond, p"do_redirect: ${n_f2_do_redirect} cfiIndex: ${n_f2_redirect_idx} NPC: 0x${Hexadecimal(n_f2_predicted_target)}\n")
-        n_f2_bpd_resp.pred.display(cond)
-        XSDebug(cond, "---------------------------------------------\n")
-      }
     }
   }
   s0_replay_bpd_resp := n_f2_bpd_resp
   s0_replay_resp := s2_tlb_resp
   s0_replay_ppc  := s2_ppc
-
-  if(enableWatchPC){
-    val cond = s2_valid && s2_vpc === watchPC.U
-    XSDebug(cond, "-----------------F2 Watch PC Info-----------------\n")
-    XSDebug(cond, p"PC: 0x${Hexadecimal(s2_vpc)}\n")
-    XSDebug(cond, p"s0_vpc: 0x${Hexadecimal(s0_vpc)}, s1_vpc: 0x${Hexadecimal(s1_vpc)}, s2_vpc: 0x${Hexadecimal(s2_vpc)}\n")
-    XSDebug(cond, p"do_redirect: ${n_f2_do_redirect} cfiIndex: ${n_f2_redirect_idx} NPC: 0x${Hexadecimal(n_f2_predicted_target)}\n")
-    n_f2_bpd_resp.pred.display(cond)
-    XSDebug(cond, "--------------------------------------------------\n")
-  }
-
-  if(enableF1vsF2BPRespDiff){
-    // check whether the taken mask of F1 and F2 are the same
-    val f1_br_taken_mask = previous_bpd_resp.pred.br_taken_mask
-    val f2_br_taken_mask = n_f2_bpd_resp.pred.br_taken_mask
-    val diff = VecInit((0 until numBr).map(i => f1_br_taken_mask(i) =/= f2_br_taken_mask(i))).asUInt.orR
-    val diff2 = n_f2_predicted_target =/= s1_vpc
-    val cond = s2_valid && f3_ready && diff && diff2
-    XSDebug(cond, "-----------------F1 vs F2 BP Resp Diff-----------------\n")
-    XSDebug(cond, p"F2 PC: 0x${Hexadecimal(s2_vpc)} F2 NPC: 0x${Hexadecimal(n_f2_predicted_target)}, S1 PC: 0x${Hexadecimal(s1_vpc)} } \n")
-    XSDebug(cond, p"F1 BPD Resp: \n")
-    previous_bpd_resp.pred.display(cond)
-    XSDebug(cond, p"F2 BPD Resp: \n")
-    n_f2_bpd_resp.pred.display(cond)
-    XSDebug(cond, "--------------------------------------------------------\n")
-  }
 
   // --------------------------------------------------------
   // **** F3 ****
