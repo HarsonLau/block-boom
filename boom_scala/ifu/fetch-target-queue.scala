@@ -314,7 +314,16 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
     io.bpdupdate.bits.lhist      := bpd_lhist
     io.bpdupdate.bits.meta       := bpd_meta
     io.bpdupdate.bits.pd         := bpd_pd // for FTB
-    io.bpdupdate.bits.ftb_entry  := bpd_ftb_entry // for FTB
+    val commitGen = Module(new CommitFTBEntryGen).io
+    commitGen.start_addr := bpd_pc
+    commitGen.target := bpd_target
+    commitGen.cfiIndex := bpd_entry.cfi_idx
+    commitGen.cfiTaken := bpd_entry.cfi_taken
+    commitGen.old_entry := bpd_ftb_entry
+    commitGen.cfi_is_br := io.bpdupdate.bits.cfi_is_br
+    commitGen.cfi_is_jalr := io.bpdupdate.bits.cfi_is_jalr
+    io.bpdupdate.bits.ftb_entry  := commitGen.new_entry
+    io.bpdupdate.bits.br_taken_mask := commitGen.taken_mask
     
     // TODO: Add support for FTB update here
 

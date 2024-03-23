@@ -1054,7 +1054,6 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   f3_fetch_bundle.ghist    := f3.io.deq.bits.ghist
   f3_fetch_bundle.lhist    := n_f3_bpd_resp.io.deq.bits.lhist
   f3_fetch_bundle.bpd_meta := n_f3_bpd_resp.io.deq.bits.meta
-  f3_fetch_bundle.ftb_entry := n_f3_ftb_entry.io.deq.bits
   
   f3_fetch_bundle.end_half.valid := bank_prev_is_half
   f3_fetch_bundle.end_half.bits  := bank_prev_half
@@ -1173,9 +1172,19 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
 
   assert(!(f3.io.deq.valid && f4_ready) || f3_predicted_target =/= 0.U, "f3_predicted_target should not be zero")
 
+  val use_pd_gen = (f3_btb_mispredicts.reduce(_||_) && enableBTBFastRepair.B) || (f3_fetch_bundle.pd.jmpInfo.valid && !n_f3_ftb_entry.io.deq.bits.valid) 
+
+  val pdGen = Module(new PredecodeFTBEntryGen).io
+  pdGen.start_addr := f3_fetch_bundle.pc
+  pdGen.old_entry := n_f3_ftb_entry.io.deq.bits
+  pdGen.pd := f3_fetch_bundle.pd
+  pdGen.cfiIndex := f3_fetch_bundle.cfi_idx
+  pdGen.target := f3_targs(f3_fetch_bundle.cfi_idx.bits)
+  f3_fetch_bundle.ftb_entry := Mux(use_pd_gen, pdGen.new_entry, n_f3_ftb_entry.io.deq.bits)
+
   // When f3 finds a btb mispredict, queue up a bpd correction update
   val f4_btb_corrections = Module(new Queue(new BlockUpdate, 2)) // TODO: add FTB support here
-  f4_btb_corrections.io.enq.valid := f3.io.deq.fire() && f3_btb_mispredicts.reduce(_||_) && enableBTBFastRepair.B
+  f4_btb_corrections.io.enq.valid := f3.io.deq.fire() && enableBTBFastRepair.B && use_pd_gen
   f4_btb_corrections.io.enq.bits  := DontCare
   f4_btb_corrections.io.enq.bits.is_mispredict_update := false.B
   f4_btb_corrections.io.enq.bits.is_repair_update     := false.B
@@ -1324,11 +1333,9 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   ftq.io.enq.bits           := f4.io.deq.bits
 
   val bpd_update_arbiter = Module(new Arbiter(new BlockUpdate, 2))
-  bpd_update_arbiter.io.in(0).valid := ftq.io.bpdupdate.valid
-  bpd_update_arbiter.io.in(0).bits  := ftq.io.bpdupdate.bits
-  assert(bpd_update_arbiter.io.in(0).ready)
-  bpd_update_arbiter.io.in(1) <> f4_btb_corrections.io.deq
-  // nbpd.io.update := bpd_update_arbiter.io.out
+  bpd_update_arbiter.io.in(1).valid := ftq.io.bpdupdate.valid
+  bpd_update_arbiter.io.in(1).bits  := ftq.io.bpdupdate.bits
+  bpd_update_arbiter.io.in(0) <> f4_btb_corrections.io.deq
   bpd_update_arbiter.io.out.ready := true.B
 
   when (ftq.io.ras_update && enableRasTopRepair.B) {
@@ -1353,74 +1360,10 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     assert(!bp_update.cfi_is_jal || bp_update.cfi_idx.bits === bp_update.pd.jmpOffset, "cfi_is_jal is true but cfi_idx is not equal to jmpOffset")
   }
 
-  val pdGen = Module(new PredecodeFTBEntryGen).io
-  pdGen.start_addr := bpd_update_arbiter.io.out.bits.pc
-  pdGen.old_entry := bpd_update_arbiter.io.out.bits.ftb_entry
-  pdGen.pd := bpd_update_arbiter.io.out.bits.pd
-  pdGen.cfiIndex := bpd_update_arbiter.io.out.bits.cfi_idx
-  pdGen.target := bpd_update_arbiter.io.out.bits.target
-
-  val commitGen = Module(new CommitFTBEntryGen).io
-  commitGen.start_addr := bpd_update_arbiter.io.out.bits.pc
-  commitGen.target := bpd_update_arbiter.io.out.bits.target
-  commitGen.cfiIndex := bpd_update_arbiter.io.out.bits.cfi_idx
-  commitGen.cfiTaken := bpd_update_arbiter.io.out.bits.cfi_taken
-  commitGen.old_entry := bpd_update_arbiter.io.out.bits.ftb_entry
-  commitGen.cfi_is_br := bpd_update_arbiter.io.out.bits.cfi_is_br
-  commitGen.cfi_is_jalr := bpd_update_arbiter.io.out.bits.cfi_is_jalr
-
-  val ftbEntryGen = Module(new FTBEntryGen).io
-  ftbEntryGen.start_addr := bpd_update_arbiter.io.out.bits.pc
-  ftbEntryGen.old_entry := bpd_update_arbiter.io.out.bits.ftb_entry
-  ftbEntryGen.pd := bpd_update_arbiter.io.out.bits.pd
-  ftbEntryGen.cfiIndex.valid := bpd_update_arbiter.io.out.bits.cfi_idx.valid && bpd_update_arbiter.io.out.valid
-  ftbEntryGen.cfiIndex.bits := bpd_update_arbiter.io.out.bits.cfi_idx.bits
-  ftbEntryGen.target := bpd_update_arbiter.io.out.bits.target
-  ftbEntryGen.cfiTaken := bpd_update_arbiter.io.out.bits.cfi_taken
-  ftbEntryGen.isF3Correction := bpd_update_arbiter.io.out.bits.btb_mispredicts.orR
-  ftbEntryGen.hit := DontCare
-  ftbEntryGen.mispredict_vec := VecInit(Seq.fill(predictWidth)(false.B)) // TODO: fixme
-
-  ftbEntryGen.new_entry := DontCare
-  ftbEntryGen.new_br_insert_pos := DontCare
-  // ftbEntryGen.taken_mask := DontCare
-  ftbEntryGen.jmp_taken := DontCare
-  ftbEntryGen.mispred_mask := DontCare
-
-  ftbEntryGen.is_init_entry := DontCare
-  ftbEntryGen.is_old_entry := DontCare
-  ftbEntryGen.is_new_br := DontCare
-  ftbEntryGen.is_jalr_target_modified := DontCare
-  ftbEntryGen.is_always_taken_modified := DontCare
-  ftbEntryGen.is_br_full := DontCare
-
   io.cpu.ftb_entry_overflow := DontCare
-
-  val is_btb_misp = bpd_update_arbiter.io.out.bits.btb_mispredicts.orR
-  val new_jmp = bpd_update_arbiter.io.out.bits.pd.jmpInfo.valid
-  val out_entry = Mux(is_btb_misp || new_jmp, pdGen.new_entry, commitGen.new_entry)
-  if(enableF4FTBGenIOPrint || enableWatchPC){
-    val cond = if(enableF4FTBGenIOPrint) bpd_update_arbiter.io.out.bits.cfi_idx.valid else bpd_update_arbiter.io.out.bits.pc === watchPC.asUInt
-    XSDebug(cond, p"--------------------ftbEntryGen out entry--------------------\n")
-    out_entry.display(cond)
-    XSDebug(cond, p"-------------------------------------------------------------\n")
-  }
-
-  // XSDebug(ftbEntryGen.cfiIndex.valid, p"fall thru: ${Hexadecimal(out_entry.getFallThrough(bpd_update_arbiter.io.out.bits.pc))}\n")
-  // XSDebug(ftbEntryGen.cfiIndex.valid, p"FTBEntry: fall-thru: ${out_entry.getFallThrough(bpd_update_arbiter.io.out.bits.pc)}\n")
 
   nbpd.io.update.valid := bpd_update_arbiter.io.out.valid
   nbpd.io.update.bits := bpd_update_arbiter.io.out.bits
-  nbpd.io.update.bits.ftb_entry := out_entry
-  nbpd.io.update.bits.br_taken_mask := commitGen.taken_mask
-
-  when(out_entry.asUInt =/= ftbEntryGen.new_entry.asUInt){
-    bpd_update_arbiter.io.out.bits.display(true.B)
-    XSDebug(true.B, p"FTBEntryGen: old entry: 0x${Hexadecimal(out_entry.asUInt)}\n")
-    out_entry.display(true.B)
-    XSDebug(true.B, p"FTBEntryGen: new entry: \n")
-    ftbEntryGen.new_entry.display(true.B)
-  }
 
   if(enablePCTracePrint){
     val cond = true.B
