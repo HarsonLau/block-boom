@@ -973,7 +973,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
 
   // When f3 finds a btb mispredict, queue up a bpd correction update
   val f4_btb_corrections = Module(new Queue(new BlockUpdate, 2)) // TODO: add FTB support here
-  f4_btb_corrections.io.enq.valid := f3.io.deq.fire() && enableBTBFastRepair.B && use_pd_gen
+  f4_btb_corrections.io.enq.valid := f3.io.deq.fire() && enableBTBFastRepair.B && f3_btb_mispredicts.reduce(_||_)
   f4_btb_corrections.io.enq.bits  := DontCare
   f4_btb_corrections.io.enq.bits.is_mispredict_update := false.B
   f4_btb_corrections.io.enq.bits.is_repair_update     := false.B
