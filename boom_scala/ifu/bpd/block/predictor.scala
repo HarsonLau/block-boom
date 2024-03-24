@@ -399,8 +399,6 @@ class BlockUpdate(implicit p: Parameters) extends BoomBundle()(p)
 
   val meta             = UInt(bpdMaxMetaLength.W)
 
-  val pd = new PredecodeBundle
-
   val ftb_entry = new FTBEntry
   val br_taken_mask = Vec(numBr, Bool())
 
@@ -409,7 +407,7 @@ class BlockUpdate(implicit p: Parameters) extends BoomBundle()(p)
     if(decimal){
       XSDebug(cond, prefix + p"pc: ${pc} br_mask: ${br_mask} cfi_idx.valid: ${cfi_idx.valid} cfi_idx.bits: ${cfi_idx.bits} cfi_taken: ${cfi_taken} cfi_mispredicted: ${cfi_mispredicted} cfi_is_br: ${cfi_is_br} cfi_is_jal: ${cfi_is_jal} cfi_is_jalr: ${cfi_is_jalr} target: ${target}\n")
       XSDebug(cond, prefix + p"btb_mispredicts: ${btb_mispredicts} is_mispredict_update: ${is_mispredict_update} is_repair_update:${is_repair_update}\n")
-      pd.display(cond, true, prefix)
+      // pd.display(cond, true, prefix)
       
       // XSDebug(cond, prefix + p"ghist:${ghist}\n")
       // XSDebug(cond, prefix + p"lhist:${lhist}\n")
@@ -417,7 +415,7 @@ class BlockUpdate(implicit p: Parameters) extends BoomBundle()(p)
     else{
       XSDebug(cond, prefix + p"pc:0x${Hexadecimal(pc)}, br_mask:${Binary(br_mask)}, cfi_idx.valid:${cfi_idx.valid}, cfi_idx.bits:${cfi_idx.bits}, cfi_taken:${cfi_taken}, cfi_mispredicted:${cfi_mispredicted}, cfi_is_br:${cfi_is_br}, cfi_is_jal:${cfi_is_jal}, cfi_is_jalr:${cfi_is_jalr}, target:0x${Hexadecimal(target)}\n")
       XSDebug(cond, prefix + p"btb_mispredicts:${Binary(btb_mispredicts)}, is_mispredict_update:${is_mispredict_update}, is_repair_update:${is_repair_update}\n")
-      pd.display(cond, false, prefix)
+      // pd.display(cond, false, prefix)
       
       // XSDebug(cond, prefix + p"ghist:${ghist}\n")
       // XSDebug(cond, prefix + p"lhist:${lhist}\n")

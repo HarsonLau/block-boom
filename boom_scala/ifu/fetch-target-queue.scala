@@ -141,7 +141,7 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
 
 
   val pcs      = Reg(Vec(num_entries, UInt(vaddrBitsExtended.W)))
-  val pds      = Reg(Vec(num_entries, new PredecodeBundle))
+  // val pds      = Reg(Vec(num_entries, new PredecodeBundle))
   val ftb_entries = Reg(Vec(num_entries, new FTBEntry))
   val meta     = SyncReadMem(num_entries,  UInt(bpdMaxMetaLength.W))
   val ram      = Reg(Vec(num_entries, new FTQBundle))
@@ -162,7 +162,7 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
   when (do_enq) {
 
     pcs(enq_ptr)           := io.enq.bits.pc
-    pds(enq_ptr)           := io.enq.bits.pd // for FTB
+    // pds(enq_ptr)           := io.enq.bits.pd // for FTB
     ftb_entries(enq_ptr)   := io.enq.bits.ftb_entry // for FTB
 
     val new_entry = Wire(new FTQBundle)
@@ -250,7 +250,7 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
   }
   val bpd_meta  = meta.read(bpd_idx, true.B) // TODO fix these SRAMs
   val bpd_pc    = RegNext(pcs(bpd_idx))
-  val bpd_pd    = RegNext(pds(bpd_idx)) // for FTB
+  // val bpd_pd    = RegNext(pds(bpd_idx)) // for FTB
   val bpd_ftb_entry = RegNext(ftb_entries(bpd_idx)) // for FTB
   val bpd_target = RegNext(pcs(WrapInc(bpd_idx, num_entries)))
 
@@ -300,12 +300,12 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
     io.bpdupdate.bits.pc      := bpd_pc   // seems like the fetch bundle's PC
     io.bpdupdate.bits.btb_mispredicts := 0.U
     io.bpdupdate.bits.br_mask := Mux(bpd_entry.cfi_idx.valid,
-      MaskLower(UIntToOH(cfi_idx)) & bpd_pd.brMask.asUInt, bpd_pd.brMask.asUInt)
+      MaskLower(UIntToOH(cfi_idx)) & bpd_entry.br_mask, bpd_entry.br_mask)
     io.bpdupdate.bits.cfi_idx := bpd_entry.cfi_idx
     io.bpdupdate.bits.cfi_mispredicted := bpd_entry.cfi_mispredicted
     io.bpdupdate.bits.cfi_taken  := bpd_entry.cfi_taken
     io.bpdupdate.bits.target     := bpd_target
-    io.bpdupdate.bits.cfi_is_br  := bpd_pd.brMask(bpd_entry.cfi_idx.bits)
+    io.bpdupdate.bits.cfi_is_br  := bpd_entry.br_mask(cfi_idx)
     io.bpdupdate.bits.cfi_is_jal := bpd_entry.cfi_type === CFI_JAL || bpd_entry.cfi_type === CFI_JALR
     assert(!io.bpdupdate.bits.cfi_is_jal || !io.bpdupdate.bits.cfi_is_br, "JAL should not be a branch")
     io.bpdupdate.bits.cfi_is_jalr := bpd_entry.cfi_type === CFI_JALR
@@ -313,7 +313,7 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
     io.bpdupdate.bits.ghist      := bpd_ghist
     io.bpdupdate.bits.lhist      := bpd_lhist
     io.bpdupdate.bits.meta       := bpd_meta
-    io.bpdupdate.bits.pd         := bpd_pd // for FTB
+    // io.bpdupdate.bits.pd         := DontCare
     val commitGen = Module(new CommitFTBEntryGen).io
     commitGen.start_addr := bpd_pc
     commitGen.target := bpd_target
