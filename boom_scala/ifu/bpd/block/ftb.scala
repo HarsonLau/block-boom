@@ -333,7 +333,7 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   val u_s0_tag = ftbUpdateAddr.getTag(u.bits.pc)
   val u_s0_idx = ftbUpdateAddr.getIdx(u.bits.pc)
   val u_s0_entry_valid_slot_mask = u.bits.ftb_entry.brValids
-  val u_s0_valid = u.valid && u.bits.ftb_entry.valid && u.bits.ftb_entry.hasValidSlot && u.bits.is_commit_update
+  val u_s0_valid = u.valid && u.bits.ftb_entry.valid && u.bits.ftb_entry.hasValidSlot && (u.bits.is_commit_update || u.bits.is_btb_mispredict_update)
 
 
   // --------------------------------------------------------

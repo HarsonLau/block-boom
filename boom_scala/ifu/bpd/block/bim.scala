@@ -143,7 +143,7 @@ class BlockBIM(params: BlockBIMParams = BlockBIMParams())(implicit p: Parameters
 
   }
 
-  when (doing_reset || (s1_update.valid && s1_update_wmask.reduce(_||_))) {
+  when (doing_reset || (s1_update.valid && s1_update_wmask.reduce(_||_) && s1_update.bits.is_commit_update)) {
     val write_index = Mux(doing_reset, reset_idx, s1_update_index)
     val write_data = Mux(doing_reset, VecInit(Seq.fill(numBr) { 2.U(2.W) }), s1_update_wdata)
     val write_mask = Mux(doing_reset, (~(0.U(numBr.W))), s1_update_wmask.asUInt).asBools
@@ -159,7 +159,7 @@ class BlockBIM(params: BlockBIMParams = BlockBIMParams())(implicit p: Parameters
     }
   }
 
-  when (s1_update_wmask.reduce(_||_) && s1_update.valid) {
+  when (s1_update_wmask.reduce(_||_) && s1_update.valid && s1_update.bits.is_commit_update) {
     when (wrbypass_hit) {
       wrbypass(wrbypass_hit_idx) := s1_update_wdata
     } .otherwise {

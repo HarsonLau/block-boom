@@ -142,6 +142,7 @@ class FauFTB(implicit p: Parameters) extends BlockPredictorBank with FauFTBParam
   val u = io.update
   val u_meta = u.bits.meta.asTypeOf(new FauFTBMeta)
   val u_s0_tag = getTag(u.bits.pc)
+  val u_s0_valid = u.valid && u.bits.ftb_entry.valid && u.bits.ftb_entry.hasValidSlot && (u.bits.is_commit_update || u.bits.is_btb_mispredict_update)
 
   ways.foreach(_.io.update_req_tag := u_s0_tag)
   val u_s0_hit_oh = VecInit(ways.map(_.io.update_hit)).asUInt
@@ -160,7 +161,7 @@ class FauFTB(implicit p: Parameters) extends BlockPredictorBank with FauFTBParam
 
   // s1
   val u_s1_pc = RegNext(u.bits.pc)
-  val u_s1_valid = RegNext(u.valid)
+  val u_s1_valid = RegNext(u_s0_valid)
   val u_s1_commit_valid = RegNext(u.valid && u.bits.is_commit_update)
   val u_s1_tag       = RegEnable(u_s0_tag, u.valid)
   val u_s1_hit_oh    = RegEnable(u_s0_hit_oh, u.valid)
