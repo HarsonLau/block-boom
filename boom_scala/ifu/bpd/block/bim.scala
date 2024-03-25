@@ -86,7 +86,6 @@ class BlockBIM(params: BlockBIMParams = BlockBIMParams())(implicit p: Parameters
   val s1_update_meta    = s1_update.bits.meta.asTypeOf(new BlockBIMMeta)
   val s1_update_index   = s1_update_idx 
   val s1_br_update_valids  = VecInit((0 until numBr).map(w => 
-    // !s1_update.bits.is_btb_mispredict_update &&
     s1_update.bits.is_commit_update &&
     s1_update.bits.ftb_entry.valid &&
     s1_update.bits.ftb_entry.brValids(w) &&
@@ -118,29 +117,6 @@ class BlockBIM(params: BlockBIMParams = BlockBIMParams())(implicit p: Parameters
 
       s1_update_wdata(w)     := bimWrite(old_bim_value, was_taken)
     }
-
-    // val update_pc = s1_update.bits.pc + (w << 1).U // TODO: fix me
-
-    /*
-    when (s1_update.bits.br_mask(w) ||
-      (s1_update.bits.cfi_idx.valid && s1_update.bits.cfi_idx.bits === w.U)) {
-      val was_taken = (
-        s1_update.bits.cfi_idx.valid &&
-        (s1_update.bits.cfi_idx.bits === w.U) &&
-        (
-          (s1_update.bits.cfi_is_br && s1_update.bits.br_mask(w) && s1_update.bits.cfi_taken) ||
-          s1_update.bits.cfi_is_jal
-        )
-      )
-      val old_bim_value = Mux(wrbypass_hit, wrbypass(wrbypass_hit_idx)(w), s1_update_meta.bims(w))
-
-      s1_update_wmask(w)     := true.B
-
-      s1_update_wdata(w)     := bimWrite(old_bim_value, was_taken)
-    }
-    */
-
-
   }
 
   when (doing_reset || (s1_update.valid && s1_update_wmask.reduce(_||_) && s1_update.bits.is_commit_update)) {
