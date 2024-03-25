@@ -232,6 +232,10 @@ class FTBEntry(implicit p: Parameters) extends BoomBundle with FTBParams with BP
     validSlots.reduce(_||_)
   }
 
+  def isFull = {
+    validSlots.reduce(_&&_)
+  }
+
   def display(cond: Bool, decimal: Boolean = false): Unit = {
     // XSDebug(cond, p"-----------FTB entry----------- \n")
     val prefix = p"FTBEntry:"

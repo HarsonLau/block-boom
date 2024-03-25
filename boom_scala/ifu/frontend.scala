@@ -626,6 +626,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   val f3_is_rvc       = Wire(Vec(fetchWidth, Bool()))
   val f3_redirects    = Wire(Vec(fetchWidth, Bool()))
   val f3_targs        = Wire(Vec(fetchWidth, UInt(vaddrBitsExtended.W)))
+  // val f3_pc_offsets   = Wire(Vec(fetchWidth, UInt(log2Ceil(fetchBytes).W)))
   val f3_cfi_types    = Wire(Vec(fetchWidth, UInt(CFI_SZ.W)))
   val f3_shadowed_mask = Wire(Vec(fetchWidth, Bool()))
   val f3_fetch_bundle = Wire(new FetchBundle)
@@ -635,7 +636,6 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   val f3_ret_mask     = Wire(Vec(fetchWidth, Bool()))
   val f3_npc_plus4_mask = Wire(Vec(fetchWidth, Bool()))
   val f3_btb_mispredicts = Wire(Vec(fetchWidth, Bool()))
-  f3_fetch_bundle.mask := f3_mask.asUInt
   // f3_fetch_bundle.br_mask := f3_br_mask.asUInt
   f3_fetch_bundle.pc := f3_imemresp.pc
   f3_fetch_bundle.ftq_idx := 0.U // This gets assigned later
@@ -658,8 +658,6 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
       f3_fetch_bundle.bpd_perf(offset).ftb_slot_hit := true.B
     }
   }
-  val f3_block_mask = n_f3_bpd_resp.io.deq.bits.pred.blockMask
-  assert(f3_block_mask.asUInt =/= 0.U, "nbpd f3 blockMask is zero") // FTB
 
   // Tracks trailing 16b of previous fetch packet
   val f3_prev_half    = Reg(UInt(16.W))
@@ -764,7 +762,6 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
       f3_is_rvc(i) := isRVC(bank_insts(w))
 
 
-      assert(f3_block_mask.asUInt =/= 0.U) // FTB
       bank_mask(w) := f3.io.deq.valid && f3_imemresp.mask(i) && valid && !redirect_found //&& f3_block_mask(i) // FTB
       f3_mask  (i) := f3.io.deq.valid && f3_imemresp.mask(i) && valid && !redirect_found //&& f3_block_mask(i) // FTB
       val bpd_predicted_target = n_f3_bpd_resp.io.deq.bits.pred.getTarget(i.asUInt, n_f3_bpd_resp.io.deq.bits.pc) // FTB
@@ -844,6 +841,13 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
       bank_prev_half)
   }
 
+  val f3_ftb_entry = n_f3_ftb_entry.io.deq.bits
+  val f3_pftAddr = f3_ftb_entry.pftAddr
+  val needFallThrough = n_f3_bpd_resp.io.deq.bits.pred.hit && f3_ftb_entry.valid &&
+  f3_pftAddr =/= 0.U && f3_pftAddr =/= 4.U && f3_ftb_entry.isFull && !f3_ftb_entry.carry &&
+   f3_mask(f3_pftAddr) && f3_br_mask(f3_pftAddr) && !f3_redirects.reduce(_||_) //&& false.B
+  val f3_block_mask = VecInit((0 until fetchWidth).map(i => f3_mask(i) && i.asUInt < f3_pftAddr))
+  f3_fetch_bundle.mask := Mux(needFallThrough, f3_block_mask.asUInt, f3_mask.asUInt)
 
   val f3_jmp_mask = f3_mask.asUInt & f3_cfi_types.map(t => t === CFI_JAL || t === CFI_JALR).asUInt 
   val f3_jmp_idx = PriorityEncoder(f3_jmp_mask)
@@ -891,7 +895,12 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
       ras.io.read_addr,
       f3_targs(PriorityEncoder(f3_redirects))
     ),
-    nextFetch(f3_fetch_bundle.pc) // TODO: use nextFetch or fallThru addr?
+    Mux(
+      needFallThrough,
+      f3_aligned_pc + (f3_pftAddr << log2Ceil(coreInstBytes)),
+      // n_f3_bpd_resp.io.deq.bits.pred.fallThroughAddr,
+      nextFetch(f3_fetch_bundle.pc)
+    )
   )
 
   f3_fetch_bundle.next_pc       := f3_predicted_target
@@ -921,7 +930,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     when (f3_fetch_bundle.cfi_is_call && f3_fetch_bundle.cfi_idx.valid) {
       ras.io.write_valid := true.B
     }
-    when (f3_redirects.reduce(_||_)) {
+    when (f3_redirects.reduce(_||_) || needFallThrough) {
       f3_prev_is_half := false.B
     }
     when (s2_valid && s2_vpc === f3_predicted_target && !f3_correct_f2_ghist) {
