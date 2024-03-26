@@ -563,6 +563,9 @@ class BoomCore(usingTrace: Boolean)(implicit p: Parameters) extends BoomModule
   val debug_commit_ftb_entry_hit_misp_br = RegInit(0.U(64.W))
   val debug_commit_ftb_slot_hit_misp_br = RegInit(0.U(64.W))
   val debug_pc_in_ckpt = RegInit(0.U(64.W))
+  when(debug_cycle % 50000.U === 0.U){
+    printf("Heart Beat Cycle: %d, commit inst: %d\n", debug_cycle, debug_commit_inst)
+  }
   when(debug_commit_inst % 20000.U < coreWidth.asUInt && debug_pc_in_ckpt =/= 0.U){
     // print the above counters in json format
     printf("{\"cycle\": %d, \"commit_inst\": %d, \"commit_misp_jalr\": %d, \"commit_br\": %d, \"commit_misp_br\": %d \"com_ftb_entry_hit_misp_br\":%d \"com_ftb_slot_hit_misp_br\":%d}\n",
