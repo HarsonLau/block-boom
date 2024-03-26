@@ -628,9 +628,8 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   val f3_is_rvc       = Wire(Vec(fetchWidth, Bool()))
   val f3_redirects    = Wire(Vec(fetchWidth, Bool()))
   val f3_targs        = Wire(Vec(fetchWidth, UInt(vaddrBitsExtended.W)))
+  val f3_pcs          = Wire(Vec(fetchWidth, UInt(vaddrBitsExtended.W)))
   // val f3_pc_offsets   = Wire(Vec(fetchWidth, UInt(log2Ceil(fetchBytes).W)))
-  val f3_fallthru_pc  = Wire(UInt(vaddrBitsExtended.W))
-  f3_fallthru_pc := nextFetch(f3_imemresp.pc)
   val f3_cfi_types    = Wire(Vec(fetchWidth, UInt(CFI_SZ.W)))
   val f3_shadowed_mask = Wire(Vec(fetchWidth, Bool()))
   val f3_fetch_bundle = Wire(new FetchBundle)
@@ -739,9 +738,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
           f3_fetch_bundle.edge_inst(b) := false.B
         }
         valid := true.B
-        when(f3_pftAddr === i.U){
-          f3_fallthru_pc := Mux(bank_prev_is_half, pc0, pc1)
-        }
+        f3_pcs(i) := Mux(bank_prev_is_half, pc0, pc1)
       } else {
         val inst = Wire(UInt(32.W))
         val exp_inst = ExpandRVC(inst)
@@ -755,9 +752,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
         f3_fetch_bundle.exp_insts(i) := exp_inst
         bpu.io.pc                    := pc
         brsigs                       := bpd_decoder.io.out
-        when(f3_pftAddr === i.U){
-          f3_fallthru_pc := pc
-        }
+        f3_pcs(i) := pc
         if (w == 1) {
           // Need special case since 0th instruction may carry over the wrap around
           inst  := bank_data(47,16)
@@ -855,7 +850,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   }
 
   val needFallThrough = n_f3_bpd_resp.io.deq.bits.pred.hit && f3_ftb_entry.valid && f3_ftb_entry.isFull && !f3_ftb_entry.carry &&
-  f3_pftAddr =/= 0.U && f3_pftAddr =/= 4.U &&
+  f3_pftAddr =/= 0.U && (f3_pftAddr =/= 4.U || !f3_is_last_bank_in_block) && // when the pftAddr is 4, we need to make sure this packet contains more than 1 bank
    f3_mask(f3_pftAddr) && f3_br_mask(f3_pftAddr) && !f3_redirects.reduce(_||_) //&& false.B
   val f3_block_mask = VecInit((0 until fetchWidth).map(i => f3_mask(i) && i.asUInt < f3_pftAddr))
   f3_fetch_bundle.mask := Mux(needFallThrough, f3_block_mask.asUInt, f3_mask.asUInt)
@@ -909,7 +904,8 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     Mux(
       needFallThrough,
       // f3_fallthru_pc,
-      f3_aligned_pc + (f3_pftAddr << log2Ceil(coreInstBytes)),
+      f3_pcs(f3_pftAddr),
+      // f3_aligned_pc + (f3_pftAddr << log2Ceil(coreInstBytes)),
       nextFetch(f3_fetch_bundle.pc)
     )
   )
