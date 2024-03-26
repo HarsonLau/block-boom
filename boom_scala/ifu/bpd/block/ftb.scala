@@ -313,7 +313,7 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   when (reset_idx === (nSets-1).U) { doing_reset := false.B }
 
 
-  val ftbAddr = new TableAddr(log2Up(numSets), 1, tagSize)
+  val ftbAddr = new FTBTableAddr(log2Up(numSets), 1, tagSize)
 
   val tag = Seq.fill(nWays) {SyncReadMem(nSets, UInt(tagSize.W))}
   val ftb = Seq.fill(nWays) {SyncReadMem(nSets, new FTBEntry)}
@@ -333,7 +333,7 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
 
   val u = io.update
   val u_meta = u.bits.meta.asTypeOf(new FTBMeta)
-  val ftbUpdateAddr = new TableAddr(log2Up(numSets), 1, tagSize)
+  val ftbUpdateAddr = new FTBTableAddr(log2Up(numSets), 1, tagSize)
   val u_s0_tag = ftbUpdateAddr.getTag(u.bits.pc)
   val u_s0_idx = ftbUpdateAddr.getIdx(u.bits.pc)
   val u_s0_entry_valid_slot_mask = u.bits.ftb_entry.brValids
