@@ -908,7 +908,8 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
     ),
     Mux(
       needFallThrough,
-      f3_fallthru_pc,
+      // f3_fallthru_pc,
+      f3_aligned_pc + (f3_pftAddr << log2Ceil(coreInstBytes)),
       nextFetch(f3_fetch_bundle.pc)
     )
   )
