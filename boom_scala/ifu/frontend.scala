@@ -469,7 +469,8 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   val n_f1_do_redirect = n_s1_bpd_resp.pred.cfiIndex.valid && useBPD.B // FTB
   
   val f1_target_candidate = n_s1_bpd_resp.pred.target(n_s1_bpd_resp.pc)
-  val n_f1_predicted_target = Mux(n_f1_do_redirect, f1_target_candidate, nextFetch(s1_vpc))
+  // val n_f1_predicted_target = Mux(n_f1_do_redirect, f1_target_candidate, nextFetch(s1_vpc))
+  val n_f1_predicted_target = f1_target_candidate
   
   val n_f1_predicted_ghist = s1_ghist.update(
     n_s1_bpd_resp.pred.br_mask.asUInt & f1_mask.asUInt, // branches
@@ -519,8 +520,9 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   val n_f2_do_redirect = n_f2_bpd_resp.pred.cfiIndex.valid && useBPD.B // FTB
   val n_f2_predicted_target = Mux(n_f2_bpd_resp.pred.hit_taken_on_jalr && n_f2_bpd_resp.pred.jalr_target.valid,
    n_f2_bpd_resp.pred.jalr_target.bits,
-   Mux(n_f2_do_redirect,n_f2_bpd_resp.pred.target(n_f2_bpd_resp.pc), nextFetch(s2_vpc))
-  ) // FTB
+   n_f2_bpd_resp.pred.target(n_f2_bpd_resp.pc)) // FTB
+  //  Mux(n_f2_do_redirect,n_f2_bpd_resp.pred.target(n_f2_bpd_resp.pc), nextFetch(s2_vpc))
+  // ) // FTB
 
   val n_f2_predicted_ghist = s2_ghist.update(
     n_f2_bpd_resp.pred.br_mask.asUInt & f2_mask.asUInt, // branches
@@ -853,6 +855,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   }
 
   val needFallThrough = n_f3_bpd_resp.io.deq.bits.pred.hit && f3_ftb_entry.valid && f3_ftb_entry.isFull && !f3_ftb_entry.carry &&
+  f3_pftAddr =/= 0.U && f3_pftAddr =/= 4.U &&
    f3_mask(f3_pftAddr) && f3_br_mask(f3_pftAddr) && !f3_redirects.reduce(_||_) //&& false.B
   val f3_block_mask = VecInit((0 until fetchWidth).map(i => f3_mask(i) && i.asUInt < f3_pftAddr))
   f3_fetch_bundle.mask := Mux(needFallThrough, f3_block_mask.asUInt, f3_mask.asUInt)
