@@ -524,7 +524,7 @@ class BoomCore(usingTrace: Boolean)(implicit p: Parameters) extends BoomModule
     com_misp_jalr(w)  := com_is_jalr(w) && uop.debug_fsrc === BSRC_C 
     com_misp_ret(w)   := com_is_ret(w)  && uop.debug_fsrc === BSRC_C 
     com_misp_jalrcall(w) := com_is_jalrcall(w) && uop.debug_fsrc === BSRC_C 
-    com_pc_in_ckpt(w) := uop.debug_pc > 0x200000L.asUInt && uop.debug_pc < 0x500000L.asUInt
+    com_pc_in_ckpt(w) := uop.debug_pc > 0x200000L.asUInt && uop.debug_pc < 0x300000L.asUInt
 
     com_misp_cfi(w) := com_misp_br(w) || com_misp_jalr(w)
   }

@@ -123,7 +123,7 @@ class CommitFTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomF
     }
   })
 
-  XSDebug(is_new_br && oe.valid, p"new br inserted for PC 0x${Hexadecimal(io.start_addr)} at 0x${Hexadecimal(new_br_offset)}\n")
+
   XSDebug(is_new_br && new_br_offset >= oe.pftAddr && oe.valid && !oe.carry, p"new br overflow at 0x${Hexadecimal(new_br_offset)}\n")
 
   val old_entry_modified = WireInit(io.old_entry)
@@ -149,6 +149,9 @@ class CommitFTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomF
     }
   }
 
+  // XSDebug(is_new_br && oe.valid, p"new br inserted for PC 0x${Hexadecimal(io.start_addr)} at 0x${Hexadecimal(new_br_offset)}\n")
+  // oe.display(is_new_br && oe.valid)
+  // old_entry_modified.display(is_new_br && oe.valid)
   // two circumstances:
   // 1. oe: | br | j  |, new br should be in front of j, thus addr of j should be new pft
   // 2. oe: | br | br |, new br could be anywhere between, thus new pft is the addr of either
@@ -160,6 +163,8 @@ class CommitFTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomF
     val new_pft_offset =
       Mux(!new_br_insert_onehot.asUInt.orR,
         new_br_offset, oe.allSlotsForBr.last.offset)
+    
+    XSDebug(pft_need_to_change, p"new pft for PC 0x${Hexadecimal(io.start_addr)} at 0x${Hexadecimal(new_pft_offset)}\n")
 
     // set jmp to invalid
     old_entry_modified.pftAddr := new_pft_offset
