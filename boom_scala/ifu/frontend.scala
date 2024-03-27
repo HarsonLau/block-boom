@@ -851,7 +851,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
 
   val needFallThrough = n_f3_bpd_resp.io.deq.bits.pred.hit && f3_ftb_entry.valid && f3_ftb_entry.isFull && !f3_ftb_entry.carry &&
   f3_pftAddr =/= 0.U && (f3_pftAddr =/= 4.U || !f3_is_last_bank_in_block) && // when the pftAddr is 4, we need to make sure this packet contains more than 1 bank
-   f3_mask(f3_pftAddr)// && f3_br_mask(f3_pftAddr) && !f3_pd_redirects.reduce(_||_) //&& false.B
+   f3_mask(f3_pftAddr) && f3_br_mask(f3_pftAddr)// && !f3_pd_redirects.reduce(_||_) //&& false.B
   val f3_block_mask = VecInit((0 until fetchWidth).map(i => f3_mask(i) && i.asUInt < f3_pftAddr))
   val f3_block_redirects = VecInit((0 until fetchWidth).map(i => f3_pd_redirects(i) && i.asUInt < f3_pftAddr))
   f3_fetch_bundle.mask := Mux(needFallThrough, f3_block_mask.asUInt, f3_mask.asUInt)
