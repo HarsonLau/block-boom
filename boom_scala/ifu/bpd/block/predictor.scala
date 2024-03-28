@@ -42,8 +42,8 @@ class FTBTableAddr(val idxBits: Int, val banks: Int, val tagSize: Int)(implicit 
   val offset = UInt(instOffsetBits.W)
 
   def fromUInt(x: UInt) = x.asTypeOf(UInt(vaddrBitsExtended.W)).asTypeOf(this)
-  // def getTag(x: UInt) = fromUInt(x).tag(tagSize - 1 - 2, 0)
-  def getTag(x: UInt) = Cat(Cat(fromUInt(x).tag(tagSize - 1 - 4, 0), fromUInt(x).tag(tagBits - 1 , tagBits - 2)), fromUInt(x).tag(pos1 - 1, pos1 - 2))
+  def getTag(x: UInt) = fromUInt(x).tag(tagSize - 1, 0)
+  // def getTag(x: UInt) = Cat(Cat(fromUInt(x).tag(tagSize - 1 - 4, 0), fromUInt(x).tag(tagBits - 1 , tagBits - 2)), fromUInt(x).tag(pos1 - 1, pos1 - 2))
   def getIdx(x: UInt) = fromUInt(x).idx
   def getBank(x: UInt) = if (banks > 1) getIdx(x)(log2Up(banks) - 1, 0) else 0.U
   def getBankIdx(x: UInt) = if (banks > 1) getIdx(x)(idxBits - 1, log2Up(banks)) else getIdx(x)
