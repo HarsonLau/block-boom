@@ -17,7 +17,7 @@ trait FTBParams extends HasBoomFTBParameters {
   val numEntries = 2048
   val numWays    = 4
   val numSets    = numEntries/numWays // 256
-  val tagSize    = 24
+  val tagSize    = 20
   val extendedNSets = 128
 
 
