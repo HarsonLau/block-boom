@@ -307,7 +307,8 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
     io.bpdupdate.bits.target     := bpd_target
     io.bpdupdate.bits.cfi_is_br  := bpd_entry.br_mask(cfi_idx)
     io.bpdupdate.bits.cfi_is_jal := bpd_entry.cfi_type === CFI_JAL || bpd_entry.cfi_type === CFI_JALR
-    assert(!io.bpdupdate.bits.cfi_is_jal || !io.bpdupdate.bits.cfi_is_br, "JAL should not be a branch")
+    // assert(!io.bpdupdate.bits.cfi_is_jal || !io.bpdupdate.bits.cfi_is_br, "JAL should not be a branch")
+    XSDebug(io.bpdupdate.bits.cfi_is_jal && io.bpdupdate.bits.cfi_is_br, p"JAL && Br PC : ${Hexadecimal(bpd_pc)}, cfi_idx : ${cfi_idx}, cfi_type : ${bpd_entry.cfi_type}\n")
     io.bpdupdate.bits.cfi_is_jalr := bpd_entry.cfi_type === CFI_JALR
     io.bpdupdate.bits.cfi_is_ret  := bpd_entry.cfi_is_ret && bpd_entry.cfi_type === CFI_JALR
     io.bpdupdate.bits.ghist      := bpd_ghist

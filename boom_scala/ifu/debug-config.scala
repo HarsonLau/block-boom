@@ -32,7 +32,7 @@ trait hasFTBDebugConfigs {
   val enableFTBPredictPrint = false
   val enableF1vsF2BPRespDiff = false
   val enableFTBJsonPredictPrint = false
-  val enableFTBJsonInsertPrint = false
+  val enableFTBJsonInsertPrint = true
   val enableFTBExtendSetPredictPrint = false
   val enableFTBExtendSetInsertPrint = false
 
