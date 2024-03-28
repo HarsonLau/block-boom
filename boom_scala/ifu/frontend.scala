@@ -175,6 +175,9 @@ with hasFTBDebugConfigs
   val predictBytes = fetchBytes
   val instOffsetBits = log2Ceil(coreInstBytes) //corresponds to  `instOffsetBits` in XiangShan
 
+  val enableFallthru = false
+  val enableTakenUnderMiss = true
+
   def blockFetchIdx(addr: UInt) = addr >> instOffsetBits
 }
 
@@ -853,7 +856,9 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   val f3_block_redirects = VecInit((0 until fetchWidth).map(i => f3_pd_redirects(i) && i.asUInt < f3_pftAddr))
   val needFallThrough = n_f3_bpd_resp.io.deq.bits.pred.hit && f3_ftb_entry.valid && f3_ftb_entry.isFull && !f3_ftb_entry.carry &&
   f3_pftAddr =/= 0.U && (f3_pftAddr =/= 4.U || !f3_is_last_bank_in_block) && // when the pftAddr is 4, we need to make sure this packet contains more than 1 bank
-   f3_mask(f3_pftAddr) && f3_br_mask(f3_pftAddr) &&(!f3_pd_redirects.reduce(_||_) || PriorityEncoder(f3_pd_redirects.asUInt) > f3_pftAddr) && PopCount(f3_block_mask.asUInt) > 1.U
+   f3_mask(f3_pftAddr) && f3_br_mask(f3_pftAddr) &&
+   (!f3_pd_redirects.reduce(_||_) || PriorityEncoder(f3_pd_redirects.asUInt) > f3_pftAddr) && PopCount(f3_block_mask.asUInt) > 1.U &&
+   enableFallthru.B
   f3_fetch_bundle.mask := Mux(needFallThrough, f3_block_mask.asUInt, f3_mask.asUInt)
 
   val f3_jmp_mask = f3_mask.asUInt & f3_cfi_types.map(t => t === CFI_JAL || t === CFI_JALR).asUInt 
