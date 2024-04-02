@@ -176,7 +176,7 @@ with hasFTBDebugConfigs
   val instOffsetBits = log2Ceil(coreInstBytes) //corresponds to  `instOffsetBits` in XiangShan
 
   val enableFallthru = false
-  val enableTakenUnderMiss = true
+  val enableTakenUnderMiss = false
 
   def blockFetchIdx(addr: UInt) = addr >> instOffsetBits
 }
@@ -472,8 +472,13 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   val n_f1_do_redirect = n_s1_bpd_resp.pred.cfiIndex.valid && useBPD.B // FTB
   
   val f1_target_candidate = n_s1_bpd_resp.pred.target(n_s1_bpd_resp.pc)
-  // val n_f1_predicted_target = Mux(n_f1_do_redirect, f1_target_candidate, nextFetch(s1_vpc))
-  val n_f1_predicted_target = f1_target_candidate
+  val n_f1_predicted_target = Wire(UInt(vaddrBitsExtended.W))
+  if (enableFallthru){
+    n_f1_predicted_target := Mux(n_f1_do_redirect, f1_target_candidate, nextFetch(s1_vpc))
+  }
+  else{
+    n_f1_predicted_target := f1_target_candidate
+  }
   
   val n_f1_predicted_ghist = s1_ghist.update(
     n_s1_bpd_resp.pred.br_mask.asUInt & f1_mask.asUInt, // branches
@@ -521,11 +526,16 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
   val f2_mask = fetchMask(s2_vpc)
   val n_f2_redirect_idx = n_f2_bpd_resp.pred.cfiIndex.bits // FTB
   val n_f2_do_redirect = n_f2_bpd_resp.pred.cfiIndex.valid && useBPD.B // FTB
+  val n_f2_target_candidate = Wire(UInt(vaddrBitsExtended.W))
+  if (enableFallthru){
+    n_f2_target_candidate := n_f2_bpd_resp.pred.target(n_f2_bpd_resp.pc)
+  }
+  else{
+    n_f2_target_candidate := Mux(n_f2_do_redirect, n_f2_bpd_resp.pred.target(n_f2_bpd_resp.pc), nextFetch(s2_vpc))
+  }
   val n_f2_predicted_target = Mux(n_f2_bpd_resp.pred.hit_taken_on_jalr && n_f2_bpd_resp.pred.jalr_target.valid,
    n_f2_bpd_resp.pred.jalr_target.bits,
-   n_f2_bpd_resp.pred.target(n_f2_bpd_resp.pc)) // FTB
-  //  Mux(n_f2_do_redirect,n_f2_bpd_resp.pred.target(n_f2_bpd_resp.pc), nextFetch(s2_vpc))
-  // ) // FTB
+   n_f2_target_candidate)
 
   val n_f2_predicted_ghist = s2_ghist.update(
     n_f2_bpd_resp.pred.br_mask.asUInt & f2_mask.asUInt, // branches
