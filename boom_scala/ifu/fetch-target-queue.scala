@@ -323,6 +323,7 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
     commitGen.old_entry := bpd_ftb_entry
     commitGen.cfi_is_br := io.bpdupdate.bits.cfi_is_br
     commitGen.cfi_is_jalr := io.bpdupdate.bits.cfi_is_jalr
+    commitGen.br_mask := io.bpdupdate.bits.br_mask
     io.bpdupdate.bits.ftb_entry  := commitGen.new_entry
     io.bpdupdate.bits.br_taken_mask := commitGen.taken_mask
     

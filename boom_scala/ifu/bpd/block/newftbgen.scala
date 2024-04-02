@@ -21,6 +21,7 @@ class PredecodeFTBEntryGen(implicit p: Parameters) extends BoomModule with HasBo
     // val need_write_back = Output(Bool())
   })
   val pd = io.pd
+  val br_mask = pd.brMask.asUInt
   val entry_has_jmp = pd.jmpInfo.valid
   val new_jmp_is_jal  = entry_has_jmp && !pd.jmpInfo.bits(0)
   val new_jmp_is_jalr = entry_has_jmp &&  pd.jmpInfo.bits(0)
@@ -52,6 +53,7 @@ class PredecodeFTBEntryGen(implicit p: Parameters) extends BoomModule with HasBo
   init_entry.isJalr := new_jmp_is_jalr
   init_entry.isCall := new_jmp_is_call
   init_entry.isRet  := new_jmp_is_ret
+  init_entry.br_mask := br_mask
 
   val oe = io.old_entry
   val derived_from_old_entry = WireInit(oe)
@@ -61,6 +63,7 @@ class PredecodeFTBEntryGen(implicit p: Parameters) extends BoomModule with HasBo
         derived_from_old_entry.allSlotsForBr(i).setLowerStatByTarget(io.start_addr, io.target, i == numBr-1)
       }    
   }
+  derived_from_old_entry.br_mask := br_mask
 
   io.new_entry := Mux(!oe.valid, init_entry, derived_from_old_entry)
 }
@@ -74,6 +77,7 @@ class CommitFTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomF
     val old_entry = Input(new FTBEntry)
     val cfi_is_br = Input(Bool())
     val cfi_is_jalr = Input(Bool())
+    val br_mask = Input(UInt(predictWidth.W))
     val new_entry = Output(new FTBEntry)
     val taken_mask = Output(Vec(numBr, Bool()))
   })
@@ -103,6 +107,7 @@ class CommitFTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomF
   init_entry.isJalr := false.B
   init_entry.isCall := false.B
   init_entry.isRet  := false.B
+  init_entry.br_mask := io.br_mask
   // --------------------------------------------------------
   // **** Insert new Br ****
   // --------------------------------------------------------
@@ -174,6 +179,7 @@ class CommitFTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomF
     old_entry_modified.isJalr := false.B
     old_entry_modified.needExtend := false.B
   }
+  old_entry_modified.br_mask := io.br_mask
 
 
   // --------------------------------------------------------
@@ -191,6 +197,7 @@ class CommitFTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomF
     val recordedTarget = old_entry_jmp_target_modified.tailSlot.getTarget(io.start_addr)
     old_entry_jmp_target_modified.needExtend := recordedTarget =/= io.target && !oe.isRet
   }
+  old_entry_jmp_target_modified.br_mask := io.br_mask
 
   // --------------------------------------------------------
   // **** Modify Always Taken ****
@@ -203,6 +210,7 @@ class CommitFTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomF
     always_taken_modified_vec(i) := oe.always_taken(i) && !old_entry_always_taken.always_taken(i)
   }
   val always_taken_modified = always_taken_modified_vec.reduce(_||_)
+  old_entry_always_taken.br_mask := io.br_mask
 
   val derived_from_old_entry =
     Mux(is_new_br, old_entry_modified,

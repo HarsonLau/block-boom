@@ -13,13 +13,18 @@ import boom.util._
 import scala.math.min
 
 case class BlockTageParams(
-  //                                           nSets, histLen, tagSz
-  tableInfo: Seq[Tuple3[Int, Int, Int]] = Seq((  128 * 4 / 2,       2,     7),
-                                              (  128 * 4 / 2,       4,     7),
-                                              (  256 * 4 / 2,       8,     8),
-                                              (  256 * 4 / 2,      16,     8),
-                                              (  128 * 4 / 2,      32,     9),
-                                              (  128 * 4 / 2,      64,     9)),
+  // //                                           nSets, histLen, tagSz
+  // tableInfo: Seq[Tuple3[Int, Int, Int]] = Seq((  128 * 8 / 2,       2,     7),
+  //                                             (  128 * 8 / 2,       4,     7),
+  //                                             (  256 * 8 / 2,       8,     8),
+  //                                             (  256 * 8 / 2,      16,     8),
+  //                                             (  128 * 8 / 2,      32,     9),
+  //                                             (  128 * 8 / 2,      64,     9)),
+  tableInfo: Seq[Tuple3[Int, Int, Int]] = Seq((1024,   8,   8),
+                                              (1024,   13,  8),
+                                              (1024,   32,  8),
+                                              (1024,   64,  8),
+                                              ),
   uBitPeriod: Int = 2048
 )
 

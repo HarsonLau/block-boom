@@ -65,7 +65,7 @@ class BlockPrediction(implicit p: Parameters) extends BoomBundle()(p)
 with HasBoomFTBParameters
 {
   val br_taken_mask = Vec(numBr, Bool())
-  // val br_mask = Vec(predictWidth, Bool())
+  val br_mask = UInt(predictWidth.W)
 
   val slot_valids = Vec(totalSlot, Bool())
 
@@ -223,9 +223,9 @@ with HasBoomFTBParameters
 
   def taken = br_taken_mask.reduce(_||_) || slot_valids.last // || (is_jal || is_jalr)
 
-  def br_mask: UInt = {
-    (br_valids zip offsets).map{ case (t, o) => (t << o)}.reduce(_|_).asUInt()
-  }
+  // def br_mask: UInt = {
+  //   (br_valids zip offsets).map{ case (t, o) => (t << o)}.reduce(_|_).asUInt()
+  // }
 
 
 
@@ -247,7 +247,7 @@ with HasBoomFTBParameters
     is_call := entry.tailSlot.valid && entry.isCall
     is_ret := entry.tailSlot.valid && entry.isRet
     is_br_sharing := entry.tailSlot.valid && entry.tailSlot.sharing
-    // br_mask := entry.br_mask
+    br_mask := entry.br_mask
     // predCycle.map(_ := GTimer())
 
     // fallThroughAddr := Mux(fallThroughErr, pc + (predictWidth * 2).U, entry.getFallThrough(pc, last_stage_entry))
@@ -266,6 +266,7 @@ with HasBoomFTBParameters
                   last_stage_entry: Option[Tuple2[FTBEntry, Bool]] = None
   ) = {
     br_taken_mask := VecInit(Seq.fill(numBr)(false.B))
+    br_mask := 0.U
     slot_valids := VecInit(Seq.fill(totalSlot)(false.B))
     targets := VecInit(Seq.fill(totalSlot)(0.U))
     jalr_target := 0.U.asTypeOf(Valid(UInt(vaddrBitsExtended.W)))
