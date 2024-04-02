@@ -351,7 +351,10 @@ class BPBankUpdate(implicit p: Parameters) extends BoomBundle()(p)
 
   def mispredSlotIdx :UInt = {
     val offsets = ftb_entry.getOffsetVec
-    val mask = VecInit(offsets.map(_ === cfi_idx.bits))
+    val valids = ftb_entry.validSlots
+    // offset === cfi_idx.bits && valid
+    val mask = VecInit(offsets.zip(valids).map{ case (o, v) => o === cfi_idx.bits && v})
+    // val mask = VecInit(offsets.map(_ === cfi_idx.bits))
     PriorityEncoder(mask)
   }
 

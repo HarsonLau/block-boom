@@ -20,10 +20,10 @@ case class BlockTageParams(
   //                                             (  256 * 8 / 2,      16,     8),
   //                                             (  128 * 8 / 2,      32,     9),
   //                                             (  128 * 8 / 2,      64,     9)),
-  tableInfo: Seq[Tuple3[Int, Int, Int]] = Seq((1024,   8,   8),
-                                              (1024,   13,  8),
-                                              (1024,   32,  8),
-                                              (1024,   64,  8),
+  tableInfo: Seq[Tuple3[Int, Int, Int]] = Seq((1024 * 4,   8,   8),
+                                              (1024 * 4,   13,  8),
+                                              (1024 * 4,   32,  8),
+                                              (1024 * 4,   64,  8),
                                               ),
   uBitPeriod: Int = 2048
 )
@@ -159,6 +159,9 @@ class BlockTage(params: BlockTageParams = BlockTageParams())(implicit p: Paramet
     // the Vec mispred_mask is of length numBr + 1
     // extract the first numBr elements 
     val idx = s1_update.bits.mispredSlotIdx
+    when(idx === 1.U){
+      s1_update.bits.display(true.B)
+    }
 
     val allocate = s1_update_meta.allocate(idx)
     when (allocate.valid) {
