@@ -23,7 +23,7 @@ case class BlockTageParams(
   tableInfo: Seq[Tuple3[Int, Int, Int]] = Seq((1024 * 4,   8,   8),
                                               (1024 * 4,   13,  8),
                                               (1024 * 4,   32,  8),
-                                              (1024 * 4,   64,  8),
+                                              (1024 * 4,   119,  8),
                                               ),
   uBitPeriod: Int = 2048
 )

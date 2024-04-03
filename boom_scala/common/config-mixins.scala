@@ -455,7 +455,7 @@ class WithBlockBPD extends Config((site, here, up) => {
   case TilesLocated(InSubsystem) => up(TilesLocated(InSubsystem), site) map {
     case tp: BoomTileAttachParams => tp.copy(tileParams = tp.tileParams.copy(core = tp.tileParams.core.copy(
       bpdMaxMetaLength = 240,
-      globalHistoryLength = 64,
+      globalHistoryLength = 120,
       localHistoryLength = 1,
       localHistoryNSets = 0,
       newBranchPredictor = ((resp_in: BPBankResponse, p: Parameters) => {
