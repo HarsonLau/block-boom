@@ -326,6 +326,9 @@ class FetchTargetQueue(implicit p: Parameters) extends BoomModule
     commitGen.br_mask := io.bpdupdate.bits.br_mask
     io.bpdupdate.bits.ftb_entry  := commitGen.new_entry
     io.bpdupdate.bits.br_taken_mask := commitGen.taken_mask
+    io.bpdupdate.bits.new_br_insert_pos := commitGen.new_br_insert_pos
+    io.bpdupdate.bits.always_taken_modified := commitGen.always_taken_modified
+    io.bpdupdate.bits.jalr_target_modified := commitGen.jalr_target_modified
     
     // TODO: Add support for FTB update here
 

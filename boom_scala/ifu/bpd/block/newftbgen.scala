@@ -80,6 +80,9 @@ class CommitFTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomF
     val br_mask = Input(UInt(predictWidth.W))
     val new_entry = Output(new FTBEntry)
     val taken_mask = Output(Vec(numBr, Bool()))
+    val new_br_insert_pos = Output(Valid(UInt(log2Ceil(numBr).W)))
+    val always_taken_modified = Output(Bool())
+    val jalr_target_modified = Output(Bool())
   })
 
   val hit = io.old_entry.valid
@@ -221,4 +224,8 @@ class CommitFTBEntryGen(implicit p: Parameters) extends BoomModule with HasBoomF
   io.taken_mask := VecInit((io.new_entry.brOffset zip io.new_entry.validSlots).map{
     case (off, v) => io.cfiIndex.bits === off && io.cfiIndex.valid && v && io.cfiTaken
   })
+  io.new_br_insert_pos.valid := hit && is_new_br
+  io.new_br_insert_pos.bits := PriorityEncoder(new_br_insert_onehot)
+  io.always_taken_modified := always_taken_modified
+  io.jalr_target_modified := jalr_target_modified
 }

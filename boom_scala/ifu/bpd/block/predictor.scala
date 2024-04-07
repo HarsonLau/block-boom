@@ -345,6 +345,9 @@ class BPBankUpdate(implicit p: Parameters) extends BoomBundle()(p)
   // val br_committed = Vec(numBr, Bool()) // High only when br valid && br committed // seems not used by any BP in Xiangshan
   // val jmp_taken = Bool() // seems for ittage
   val mispred_mask = Vec(numBr+1, Bool()) // seems for tage
+  val new_br_insert_pos = Valid(UInt(log2Ceil(numBr).W))
+  val always_taken_modified = Bool()
+  val jalr_target_modified = Bool()
   // val pred_hit = Bool()
   // val false_hit = Bool()
   // val new_br_insert_pos = Vec(numBr, Bool()) // seems not used by any BP in Xiangshan
@@ -407,6 +410,10 @@ class BlockUpdate(implicit p: Parameters) extends BoomBundle()(p)
 
   val ftb_entry = new FTBEntry
   val br_taken_mask = Vec(numBr, Bool())
+
+  val new_br_insert_pos = Valid(UInt(log2Ceil(numBr).W))
+  val always_taken_modified = Bool()
+  val jalr_target_modified = Bool()
 
   def display(cond: Bool , decimal:Boolean = false, _prefix:chisel3.Printable = p""):Unit={
     val prefix = _prefix + p"BranchPredictionUpdate: "
@@ -616,6 +623,9 @@ class BlockPredictor(implicit p:Parameters) extends BoomModule()(p)
   predictors.io.update.bits.br_taken_mask := io.update.bits.br_taken_mask
 
   predictors.io.update.bits.mispred_mask := DontCare
+  predictors.io.update.bits.new_br_insert_pos := io.update.bits.new_br_insert_pos
+  predictors.io.update.bits.always_taken_modified := io.update.bits.always_taken_modified
+  predictors.io.update.bits.jalr_target_modified := io.update.bits.jalr_target_modified
 
   lhist_providers.io.update.valid := io.update.valid && io.update.bits.br_mask =/= 0.U
   lhist_providers.io.update.pc := io.update.bits.pc // TODO: the original impl uses bankAlignPC
