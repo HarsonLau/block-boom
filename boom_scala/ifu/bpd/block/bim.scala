@@ -38,6 +38,7 @@ class BlockBIM(params: BlockBIMParams = BlockBIMParams())(implicit p: Parameters
       Mux(old_bim_sat_ntaken && !taken, 0.U,
       Mux(taken, v + 1.U, v - 1.U)))
   }
+  val s1_meta           = Wire(new BlockBIMMeta)
   val s2_meta           = Wire(new BlockBIMMeta)
   override val metaSz   = s2_meta.asUInt.getWidth
 
@@ -51,8 +52,11 @@ class BlockBIM(params: BlockBIMParams = BlockBIMParams())(implicit p: Parameters
 
   val mems = Seq(("bim", nSets, numBr * 2))
 
-  val s2_req_rdata    = RegNext(data.read(s0_idx   , s0_valid)) //TODO: fixme use start PC
 
+  val s1_req_rdata    = data.read(s0_idx, s0_valid)
+  val s2_req_rdata    = RegNext(s1_req_rdata)
+
+  val s1_resp         = Wire(Vec(numBr, Bool()))
   val s2_resp         = Wire(Vec(numBr, Bool()))
 
   if(enableBIMPredictPrint){
@@ -66,12 +70,17 @@ class BlockBIM(params: BlockBIMParams = BlockBIMParams())(implicit p: Parameters
   }
 
   for (w <- 0 until numBr) {
+    s1_resp(w)        := s1_valid && s1_req_rdata(w)(1) && !doing_reset // TODO: FTB entry should be used
+    s1_meta.bims(w)   := s1_req_rdata(w)
 
-    s2_resp(w)        := s2_valid && s2_req_rdata(w)(1) && !doing_reset // TODO: FTB entry should be used
-    s2_meta.bims(w)   := s2_req_rdata(w)
+
+    s2_resp(w)        := RegNext(s1_resp(w))
+    s2_meta.bims(w)   := RegNext(s1_meta.bims(w))
   }
 
   for (w <- 0 until numBr) {
+    io.resp.f1.br_taken_mask(w) := s1_resp(w)
+    io.resp.f1.perfs(w).bim_taken := s1_resp(w)
     io.resp.f2.br_taken_mask(w) := s2_resp(w)
     io.resp.f2.perfs(w).bim_taken := s2_resp(w)
     io.resp.f3.br_taken_mask(w) := RegNext(io.resp.f2.br_taken_mask(w))

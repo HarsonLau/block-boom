@@ -368,6 +368,20 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   s1_meta.hit := s1_hit && !s1_hit_fallthrough_error
   s1_meta.writeWay := s1_hit_way.asUInt
 
+  // Deliever the prediction in F1 Stage
+  io.resp.f1 := io.resp_in(0).f1
+  io.resp.f1.jalr_target.bits := Mux(s1_req_rebtb=/=0.U, s1_req_rebtb, nextFetch(s1_pc))
+  when(s1_hit && !s1_hit_fallthrough_error) {
+    io.resp.f1.fromFtbEntry(s1_ftb_entry, s1_pc)
+    io.resp.f1.jalr_target.valid := s1_ftb_entry.needExtend
+    for (i <- 0 until numBr) {
+      io.resp.f1.perfs(i).ftb_entry_hit := true.B
+      when(s1_ftb_entry.always_taken(i)) {
+        io.resp.f1.br_taken_mask(i) := true.B
+      }
+    }
+  }
+
   // --- Update Logic ---
   val u_s1_pc = RegNext(u.bits.pc)
   val u_s1_target = RegNext(u.bits.target)
@@ -442,10 +456,8 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   // **** (S2) ****
   // --------------------------------------------------------
 
-  io.resp.f2 := io.resp_in(0).f2
-  io.resp.f2.jalr_target.bits := Mux(RegNext(s1_req_rebtb)=/=0.U, RegNext(s1_req_rebtb), nextFetch(s2_pc))
-  io.resp.f3 := io.resp_in(0).f3
-  io.resp.f3.jalr_target.bits := RegNext(io.resp.f2.jalr_target.bits)
+  // io.resp.f2 := RegNext(io.resp.f1)
+  // io.resp.f3 := RegNext(io.resp.f2)
   when(RegNext(s1_hit && !s1_hit_fallthrough_error)) {
     io.resp.f2.fromFtbEntry(RegNext(s1_ftb_entry), RegNext(s1_pc))
     io.resp.f2.jalr_target.valid := RegNext(s1_ftb_entry.needExtend)
