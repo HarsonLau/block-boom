@@ -180,8 +180,8 @@ with HasBoomFTBParameters
 
   def validPredict(idx: UInt):Bool = {
     val idx_match_mask = VecInit(offsets.map(_ === idx))
-    val taken_idx_match_mask = idx_match_mask.zip(taken_mask_on_slot).map{ case (a, b) => a && b}
-    taken_idx_match_mask.reduce(_||_)
+    val valid_idx_match_mask = idx_match_mask.zip(slot_valids).map{ case (a, b) => a && b}
+    valid_idx_match_mask.reduce(_||_)
   }
 
   // if there is a jmp in the entry, return the target of the jmp
