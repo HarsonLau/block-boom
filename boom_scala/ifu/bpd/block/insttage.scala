@@ -44,6 +44,7 @@ class InstTageTable(val nColumns: Int, val nRows: Int, val tagSz: Int, val histL
     val update_u_mask = Input(Vec(nColumns, Bool()))
     val update_u = Input(Vec(nColumns, UInt(2.W)))
   })
+  io.f3_resp := DontCare
 
   def compute_folded_hist(hist: UInt, l: Int) = {
     val nChunks = (histLength + l - 1) / l
@@ -187,7 +188,7 @@ case class InstTageParams(
 
 class InstTage(params: InstTageParams = InstTageParams())(implicit p: Parameters) extends BlockPredictorBank()(p)
 {
-  val nColumns = numBr
+  val nColumns = 1
   val tageUBitPeriod = params.uBitPeriod
   val tageNTables    = params.tableInfo.size
 
@@ -201,15 +202,16 @@ class InstTage(params: InstTageParams = InstTageParams())(implicit p: Parameters
   }
 
   val f3_meta = Wire(new TageMeta)
+  f3_meta:=DontCare
   override val metaSz = f3_meta.asUInt.getWidth
   require(metaSz <= bpdMaxMetaLength)
 
   val cfi_offsets = io.resp_in(0).f1.offsets
   val s1_bankAlignPC = bankAlign(s1_pc)
-  val s1_cfi_pcs     = VecInit((0 until numBr).map(i => s1_bankAlignPC + cfi_offsets(i)<<instOffsetBits))
-  val s0_u_bankAlignPC = bankAlign(io.update.bits.pc)
-  val s0_u_offsets   = io.update.bits.ftb_entry.getOffsetVec
-  val s0_u_cfi_pcs   = VecInit((0 until numBr).map(i => s0_u_bankAlignPC + s0_u_offsets(i)<<instOffsetBits))
+  val s1_cfi_pcs     = VecInit((0 until nColumns).map(i => s1_bankAlignPC + cfi_offsets(i)<<instOffsetBits))
+  val s1_u_bankAlignPC = bankAlign(s1_update.bits.pc)
+  val s1_u_offsets   = s1_update.bits.ftb_entry.getOffsetVec
+  val s1_u_cfi_pcs   = VecInit((0 until nColumns).map(i => s1_u_bankAlignPC + s1_u_offsets(i)<<instOffsetBits))
 
   def inc_u(u: UInt, alt_differs: Bool, mispredict: Bool): UInt = {
     Mux(!alt_differs, u,
@@ -242,6 +244,14 @@ class InstTage(params: InstTageParams = InstTageParams())(implicit p: Parameters
   val s1_update_alloc   = Wire(Vec(tageNTables, Vec(nColumns, Bool())))
   val s1_update_u       = Wire(Vec(tageNTables, Vec(nColumns, UInt(2.W))))
 
+  val s1_br_update_valids  = VecInit((0 until numBr).map(w => 
+    s1_update.bits.is_commit_update &&
+    s1_update.bits.ftb_entry.valid &&
+    s1_update.bits.ftb_entry.brValids(w) &&
+    s1_update.valid &&
+    // !s1_update.bits.ftb_entry.always_taken(w) &&
+    !(PriorityEncoder(s1_update.bits.br_taken_mask) < w.U)))
+  
   s1_update_taken   := DontCare
   s1_update_old_ctr := DontCare
   s1_update_alloc   := DontCare
@@ -293,32 +303,26 @@ class InstTage(params: InstTageParams = InstTageParams())(implicit p: Parameters
 
     val s1_slot_offset = s1_update.bits.ftb_entry.getOffsetVec(w)
     val s1_slot_mispredicted = s1_update.bits.cfi_idx.valid && (s1_update.bits.cfi_idx.bits === s1_slot_offset) && s1_update.bits.cfi_mispredicted
-    val update_was_taken = (s1_update.bits.cfi_idx.valid &&
-                            (s1_update.bits.cfi_idx.bits === s1_slot_offset) &&
-                            s1_update.bits.cfi_taken)
+    val update_was_taken = s1_update.bits.br_taken_mask(w)
   
-    when (s1_update.bits.br_mask(s1_slot_offset) && s1_update.valid && s1_update.bits.is_commit_update) {
-      val old_column_idx = Mux(s1_update.bits.new_br_insert_pos.valid && s1_update.bits.new_br_insert_pos.bits < w.U, 
-      w.U - 1.U , w.U)
-      when (s1_update_meta.provider(old_column_idx).valid) {
-        val provider = s1_update_meta.provider(old_column_idx).bits
+    when (s1_update_meta.provider(w).valid && s1_br_update_valids(w)) {
+      val provider = s1_update_meta.provider(w).bits
 
-        s1_update_mask(provider)(w) := true.B
-        s1_update_u_mask(provider)(w) := true.B
+      s1_update_mask(provider)(w) := true.B
+      s1_update_u_mask(provider)(w) := true.B
 
-        val new_u = inc_u(s1_update_meta.provider_u(old_column_idx),
-                          s1_update_meta.alt_differs(old_column_idx),
-                          s1_slot_mispredicted)
-        s1_update_u      (provider)(w) := new_u
-        s1_update_taken  (provider)(w) := update_was_taken
-        s1_update_old_ctr(provider)(w) := s1_update_meta.provider_ctr(old_column_idx)
-        s1_update_alloc  (provider)(w) := false.B
+      val new_u = inc_u(s1_update_meta.provider_u(w),
+                        s1_update_meta.alt_differs(w),
+                        s1_slot_mispredicted)
+      s1_update_u      (provider)(w) := new_u
+      s1_update_taken  (provider)(w) := update_was_taken
+      s1_update_old_ctr(provider)(w) := s1_update_meta.provider_ctr(w)
+      s1_update_alloc  (provider)(w) := false.B
 
-      }
     }
   }
 
-  when (s1_update.valid && s1_update.bits.is_commit_update && s1_update.bits.cfi_mispredicted && s1_update.bits.cfi_idx.valid && s1_update.bits.br_mask(s1_update.bits.cfi_idx.bits)) {
+  when (s1_update.bits.mispredSlotIdx < nColumns.U && s1_br_update_valids(s1_update.bits.mispredSlotIdx) && s1_update.bits.cfi_mispredicted) {
     // the Vec mispred_mask is of length numBr + 1
     // extract the first numBr elements 
     val idx = s1_update.bits.mispredSlotIdx
@@ -356,7 +360,7 @@ class InstTage(params: InstTageParams = InstTageParams())(implicit p: Parameters
 
       tables(i).io.update_u_mask(w) := RegNext(s1_update_u_mask(i)(w))
       tables(i).io.update_u(w)      := RegNext(s1_update_u(i)(w))
-      tables(i).io.update_pc(w)    := RegNext(RegNext(s0_u_cfi_pcs(w)))
+      tables(i).io.update_pc(w)    := RegNext(s1_u_cfi_pcs(w))
     }
     tables(i).io.update_hist  := RegNext(s1_update.bits.ghist)
   }
