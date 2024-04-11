@@ -206,6 +206,8 @@ class InstTage(params: InstTageParams = InstTageParams())(implicit p: Parameters
   override val metaSz = f3_meta.asUInt.getWidth
   require(metaSz <= bpdMaxMetaLength)
 
+  io.resp := io.resp_in(0)
+
   val cfi_offsets = io.resp_in(0).f1.offsets
   val s1_bankAlignPC = bankAlign(s1_pc)
   val s1_cfi_pcs     = VecInit((0 until nColumns).map(i => s1_bankAlignPC + cfi_offsets(i)<<instOffsetBits))
