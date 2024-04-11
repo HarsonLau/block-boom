@@ -1,4 +1,4 @@
-package boom.ifu
+/*package boom.ifu
 
 import chisel3._
 import chisel3.util._
@@ -14,14 +14,13 @@ import scala.{Tuple2 => &}
 
 import scala.math.min
 
-trait FauFTBParams extends HasBoomFTBParameters {
+trait VFTBParams extends HasBoomFTBParameters {
   val numWays = 16 // note: the uBTB in BOOM has 16 ways
   val tagSize = 20
-
-  val TAR_STAT_SZ = 2
-  def TAR_FIT = 0.U(TAR_STAT_SZ.W)
-  def TAR_OVF = 1.U(TAR_STAT_SZ.W)
-  def TAR_UDF = 2.U(TAR_STAT_SZ.W)
+  val numEntries = 2048
+  val numWays    = 4
+  val numSets    = numEntries/numWays // 256
+  val extendedNSets = 128
 
   def BR_OFFSET_LEN = 12
   def JMP_OFFSET_LEN = 20
@@ -29,62 +28,42 @@ trait FauFTBParams extends HasBoomFTBParameters {
   def getTag(pc: UInt) = pc(tagSize+instOffsetBits-1, instOffsetBits)
 }
 
-class FauFTBEntry(implicit p: Parameters) extends FTBEntry()(p) {}
+class VFTB(implicit p: Parameters) extends BlockPredictorBank with VFTBParams {
+  // uFTB memory array
 
-class FauFTBWay(implicit p: Parameters) extends BoomModule()(p) with FauFTBParams {
-  val io = IO(new Bundle{
-    val req_tag = Input(UInt(tagSize.W))
-    val resp = Output(new FauFTBEntry)
-    val resp_hit = Output(Bool())
-    val update_req_tag = Input(UInt(tagSize.W))
-    val update_hit = Output(Bool())
-    val write_valid = Input(Bool())
-    val write_entry = Input(new FauFTBEntry)
-    val write_tag = Input(UInt(tagSize.W))
-    val tag_read = Output(UInt(tagSize.W))
-  })
-
-  val data = Reg(new FauFTBEntry)
-  val tag = Reg(UInt(tagSize.W))
-  val valid = RegInit(false.B)
-
-  io.resp := data
-  io.resp_hit := tag === io.req_tag && valid
-  // write bypass to avoid multiple hit
-  io.update_hit := ((tag === io.update_req_tag) && valid) ||
-                   ((io.write_tag === io.update_req_tag) && io.write_valid)
-  io.tag_read := tag
-
-  when (io.write_valid) {
-    when (!valid) {
-      valid := true.B
-    }
-    tag   := io.write_tag
-    data  := io.write_entry
-  }
-}
-
-class FauFTB(implicit p: Parameters) extends BlockPredictorBank with FauFTBParams {
-  class FauFTBMeta(implicit p: Parameters) extends BoomBundle with FauFTBParams {
-    // val pred_way = UInt(log2Ceil(numWays).W)
-    val hit = Bool()
-  }
-  val resp_meta = Wire(new FauFTBMeta)
-  resp_meta := DontCare
-  val meta_size = resp_meta.getWidth
+  // --------------------------------------------------------
+  // **** FauFTB Memory Array ****
+  // --------------------------------------------------------
 
   val ways = Seq.tabulate(numWays)(w => Module(new FauFTBWay))
   val ctrs = Seq.tabulate(numWays)(w => Seq.tabulate(numBr)(b => RegInit(2.U(2.W))))
   val replacer = ReplacementPolicy.fromString("plru", numWays)
   val replacer_touch_ways = Wire(Vec(2, Valid(UInt(log2Ceil(numWays).W))))
 
-  val mems = Nil
+  val doing_reset = RegInit(true.B)
+  val reset_idx   = RegInit(0.U(log2Ceil(nSets).W))
+  reset_idx := reset_idx + doing_reset
+  when (reset_idx === (nSets-1).U) { doing_reset := false.B }
 
   // --------------------------------------------------------
-  // **** Prediction Logic ****
+  // **** FTB Memory Array ****
   // --------------------------------------------------------
+  val ftbAddr = new FTBTableAddr(log2Up(numSets), 1, tagSize)
 
-  // pred req
+  val tag = Seq.fill(nWays) {SyncReadMem(nSets, UInt(tagSize.W))}
+  val ftb = Seq.fill(nWays) {SyncReadMem(nSets, new FTBEntry)}
+
+  val ebtb     = SyncReadMem(extendedNSets, UInt(vaddrBitsExtended.W))
+
+  val mems = (((0 until nWays) map ({w:Int => Seq(
+    (f"ftb_tag_way$w", nSets, tagSize),
+    (f"ftb_data_way$w", nSets, ftbEntrySz))})).flatten++ Seq(("ebtb", extendedNSets, vaddrBitsExtended)))
+  
+  
+  // --------------------------------------------------------
+  // **** FauFTB Prediction Logic ****
+  // --------------------------------------------------------
+  
   ways.foreach(_.io.req_tag := getTag(s1_pc)) // use the F1 pc as the BOOM.ubtb and XiangShan.FauFTB do
   
   // pred resp
@@ -125,7 +104,7 @@ class FauFTB(implicit p: Parameters) extends BlockPredictorBank with FauFTBParam
   }
 
   io.resp.f2 := RegNext(io.resp.f1)
-  io.resp.f3 := RegNext(RegNext(io.resp.f1))
+  io.resp.f3 := RegNext(io.resp.f2)
 
   io.resp.last_stage_entry := RegNext(RegNext(s1_hit_ftb_entry))
   io.resp.f3_meta := DontCare
@@ -180,14 +159,7 @@ class FauFTB(implicit p: Parameters) extends BlockPredictorBank with FauFTBParam
     ways(w).io.write_entry := u_s1_ftb_entry
   }
   val u_s1_need_evict = u_s1_valid && !u_s1_hit && !u_s1_ftb_entry_empty
-  val u_s1_evict_entry = Mux1H(u_s1_write_way_oh, ways.map(_.io.resp))
-  when(u_s1_need_evict){
-    XSDebug(true.B, p"Evict entry for PC : ${u_s1_pc}\n")
-    XSDebug(true.B, p"Evict entry is : \n")
-    u_s1_evict_entry.display(true.B)
-    XSDebug(true.B, p"New entry is :\n")
-    u_s1_ftb_entry.display(true.B)
-  }
+  val u_s1_evict_entry = Mux1H(u_s1_write_way_oh, s1_all_entries)
 
   // update saturating counters
   val u_s1_br_update_valids = RegEnable(u_s0_br_update_valids, u.valid)
@@ -207,31 +179,5 @@ class FauFTB(implicit p: Parameters) extends BlockPredictorBank with FauFTBParam
   replacer_touch_ways(1).bits  := OHToUInt(u_s1_write_way_oh)
   replacer.access(replacer_touch_ways)
 
-  // --------------------------------------------------------
-  // **** Debug Messages ****
-  // --------------------------------------------------------
-
-  if(enableFauFTBUpdateDetailPrint || enableWatchPC){
-    val printCond = u.valid
-    val watchCond = u.valid && u.bits.pc === watchPC.U
-    val cond = if(enableFauFTBUpdateDetailPrint) printCond else watchCond
-    XSDebug(cond, p"-------FauFTB update entry for PC : ${u.bits.pc}-------\n")
-    u.bits.display(cond)
-    XSDebug(cond, p"-----------------------------------\n")
-  }
-
-  // check fall through error
-  val cond = u.valid && u.bits.ftb_entry.valid && u.bits.ftb_entry.getFallThrough(u.bits.pc) <= u.bits.pc
-  XSDebug(cond, p"FauFTB fall through error for PC : 0x${Hexadecimal(u.bits.pc)}\n")
-  u.bits.display(cond)
-  XSDebug(cond, p"-----------------------------------\n")
-  if(enableFauFTBInsertionPrint || enableWatchPC){
-    val printCond = u_s1_valid && !u_s1_ftb_entry_empty
-    val watchCond = u_s1_valid && !u_s1_ftb_entry_empty && u_s1_pc === watchPC.U
-    val cond = if(enableFauFTBInsertionPrint) printCond else watchCond
-    XSDebug(cond, p"-------FauFTB insert entry for PC : ${u_s1_pc}-------\n")
-    u_s1_ftb_entry.display(cond)
-    XSDebug(cond, p"-----------------------------------\n")
-  }
-
 }
+*/
