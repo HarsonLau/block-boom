@@ -28,23 +28,25 @@ class InstTageTable(val nColumns: Int, val nRows: Int, val tagSz: Int, val histL
   val nWrBypassEntries = 2
   val io = IO( new Bundle {
     val f1_req_valid = Input(Bool())
-    val f1_req_pc    = Input(Vec(nColumns, UInt(vaddrBitsExtended.W)))
+    val f1_req_pc    = Input(UInt(vaddrBitsExtended.W))
     val f1_req_ghist = Input(UInt(globalHistoryLength.W))
 
-    val f3_resp = Output(Vec(nColumns, Valid(new TageResp)))
+    val f3_resp = Output(Valid(new TageResp))
 
-    val update_mask    = Input(Vec(nColumns, Bool()))
-    val update_taken   = Input(Vec(nColumns, Bool()))
-    val update_alloc   = Input(Vec(nColumns, Bool()))
-    val update_old_ctr = Input(Vec(nColumns, UInt(3.W)))
+    val update_mask    = Input(Bool())
+    val update_taken   = Input(Bool())
+    val update_alloc   = Input(Bool())
+    val update_old_ctr = Input(UInt(3.W))
 
-    val update_pc    = Input(Vec(nColumns, UInt(vaddrBitsExtended.W)))
+    val update_pc    = Input(UInt(vaddrBitsExtended.W))
     val update_hist  = Input(UInt())
 
-    val update_u_mask = Input(Vec(nColumns, Bool()))
-    val update_u = Input(Vec(nColumns, UInt(2.W)))
+    val update_u_mask = Input(Bool())
+    val update_u = Input(UInt(2.W))
   })
   io.f3_resp := DontCare
+
+  val nPartition = 4
 
   def compute_folded_hist(hist: UInt, l: Int) = {
     val nChunks = (histLength + l - 1) / l
@@ -55,11 +57,23 @@ class InstTageTable(val nColumns: Int, val nRows: Int, val tagSz: Int, val histL
   }
 
   def compute_tag_and_hash(unhashed_idx: UInt, hist: UInt) = {
-    val idx_history = compute_folded_hist(hist, log2Ceil(nRows))
-    val idx = (unhashed_idx ^ idx_history)(log2Ceil(nRows)-1,0)
+    val realNRows = nRows / nPartition
+    val idx_history = compute_folded_hist(hist, log2Ceil(realNRows))
+    val idx = (unhashed_idx ^ idx_history)(log2Ceil(realNRows)-1,0)
     val tag_history = compute_folded_hist(hist, tagSz)
-    val tag = ((unhashed_idx >> log2Ceil(nRows)) ^ tag_history)(tagSz-1,0)
+    val tag = ((unhashed_idx >> log2Ceil(realNRows)) ^ tag_history)(tagSz-1,0)
     (idx, tag)
+  }
+
+  def compute_tag_and_hash_v1(unhashed_idx: UInt, hist: UInt) = {
+    val (idx, tag) = compute_tag_and_hash(unhashed_idx >> log2Ceil(nPartition), hist)
+
+    if (nPartition == 1) {
+      (idx, tag)
+    } else {
+      val idx1 = idx
+      (Cat(idx1, unhashed_idx(log2Ceil(nPartition) - 1, 0)), tag)
+    }
   }
 
   def inc_ctr(ctr: UInt, taken: Bool): UInt = {
@@ -87,19 +101,17 @@ class InstTageTable(val nColumns: Int, val nRows: Int, val tagSz: Int, val histL
   val lo_us  = SyncReadMem(nRows,  Bool())
   val table  = SyncReadMem(nRows,  UInt(tageEntrySz.W))
   val mems = Seq((f"tage_l$histLength", nRows, tageEntrySz))
-  for (w <- 0 until nColumns) {
-    val (s1_hashed_idx, s1_tag) = compute_tag_and_hash(blockFetchIdx(io.f1_req_pc(w)), io.f1_req_ghist)
+    val (s1_hashed_idx, s1_tag) = compute_tag_and_hash_v1(blockFetchIdx(io.f1_req_pc), io.f1_req_ghist)
     val s2_tag = RegNext(s1_tag)
     val s2_req_rtage = table.read(s1_hashed_idx, io.f1_req_valid).asTypeOf(new TageEntry)
     val s2_req_rhius = hi_us.read(s1_hashed_idx, io.f1_req_valid)
     val s2_req_rlous = lo_us.read(s1_hashed_idx, io.f1_req_valid)
     val s2_req_rhits = s2_req_rtage.valid && s2_req_rtage.tag === s2_tag && !doing_reset
 
-    io.f3_resp(w).valid    := RegNext(s2_req_rhits)
-    io.f3_resp(w).bits.u   := RegNext(Cat(s2_req_rhius, s2_req_rlous))
-    io.f3_resp(w).bits.ctr := RegNext(s2_req_rtage.ctr)
+    io.f3_resp.valid    := RegNext(s2_req_rhits)
+    io.f3_resp.bits.u   := RegNext(Cat(s2_req_rhius, s2_req_rlous))
+    io.f3_resp.bits.ctr := RegNext(s2_req_rtage.ctr)
 
-  }
 
   val clear_u_ctr = RegInit(0.U((log2Ceil(uBitPeriod) + log2Ceil(nRows) + 1).W))
   when (doing_reset) { clear_u_ctr := 1.U } .otherwise { clear_u_ctr := clear_u_ctr + 1.U }
@@ -109,12 +121,11 @@ class InstTageTable(val nColumns: Int, val nRows: Int, val tagSz: Int, val histL
   val doing_clear_u_lo = doing_clear_u && clear_u_ctr(log2Ceil(uBitPeriod) + log2Ceil(nRows)) === 0.U
   val clear_u_idx = clear_u_ctr >> log2Ceil(uBitPeriod)
 
-  for (w <- 0 until nColumns) {
-    val (update_idx, update_tag) = compute_tag_and_hash(blockFetchIdx(io.update_pc(w)), io.update_hist)
+    val (update_idx, update_tag) = compute_tag_and_hash_v1(blockFetchIdx(io.update_pc), io.update_hist)
 
     val update_wdata = Wire(new TageEntry)
 
-    when(doing_reset || io.update_mask(w)){
+    when(doing_reset || io.update_mask){
       table.write(
         Mux(doing_reset, reset_idx, update_idx),
         Mux(doing_reset, 0.U(tageEntrySz.W), update_wdata.asUInt)
@@ -122,7 +133,7 @@ class InstTageTable(val nColumns: Int, val nRows: Int, val tagSz: Int, val histL
     }
 
     val update_hi_wdata = Wire(Bool())
-    when(doing_reset || doing_clear_u_hi || io.update_u_mask(w)){
+    when(doing_reset || doing_clear_u_hi || io.update_u_mask){
       hi_us.write(
         Mux(doing_reset, reset_idx, Mux(doing_clear_u_hi, clear_u_idx, update_idx)),
         Mux(doing_reset || doing_clear_u_hi, 0.B, update_hi_wdata)
@@ -130,7 +141,7 @@ class InstTageTable(val nColumns: Int, val nRows: Int, val tagSz: Int, val histL
     }
 
     val update_lo_wdata = Wire(Bool())
-    when(doing_reset || doing_clear_u_lo || io.update_u_mask(w)){
+    when(doing_reset || doing_clear_u_lo || io.update_u_mask){
       lo_us.write(
         Mux(doing_reset, reset_idx, Mux(doing_clear_u_lo, clear_u_idx, update_idx)),
         Mux(doing_reset || doing_clear_u_lo, 0.B, update_lo_wdata)
@@ -151,18 +162,18 @@ class InstTageTable(val nColumns: Int, val nRows: Int, val tagSz: Int, val histL
     val wrbypass_hit_idx = PriorityEncoder(wrbypass_hits)
 
 
-    update_wdata.ctr   := Mux(io.update_alloc(w),
-      Mux(io.update_taken(w), 4.U, 3.U),
-      Mux(wrbypass_hit, inc_ctr(wrbypass(wrbypass_hit_idx), io.update_taken(w)),
-                        inc_ctr(io.update_old_ctr(w), io.update_taken(w))
+    update_wdata.ctr   := Mux(io.update_alloc,
+      Mux(io.update_taken, 4.U, 3.U),
+      Mux(wrbypass_hit, inc_ctr(wrbypass(wrbypass_hit_idx), io.update_taken),
+                        inc_ctr(io.update_old_ctr, io.update_taken)
       )
     )
     update_wdata.valid := true.B
     update_wdata.tag   := update_tag
-    update_hi_wdata    := io.update_u(w)(1)
-    update_lo_wdata    := io.update_u(w)(0)
+    update_hi_wdata    := io.update_u(1)
+    update_lo_wdata    := io.update_u(0)
 
-    when (io.update_mask(w)) {
+    when (io.update_mask) {
       when(wrbypass_hits.reduce(_||_)) {
         wrbypass(wrbypass_hit_idx) := update_wdata.ctr
       } .otherwise {
@@ -172,7 +183,6 @@ class InstTageTable(val nColumns: Int, val nRows: Int, val tagSz: Int, val histL
         wrbypass_enq_idx := WrapInc(wrbypass_enq_idx, nWrBypassEntries)
       }
     }
-  }
 }
 
 case class InstTageParams(
@@ -188,17 +198,17 @@ case class InstTageParams(
 
 class InstTage(params: InstTageParams = InstTageParams())(implicit p: Parameters) extends BlockPredictorBank()(p)
 {
-  val nColumns = 1
+  // val nColumns = 1
   val tageUBitPeriod = params.uBitPeriod
   val tageNTables    = params.tableInfo.size
 
   class TageMeta extends Bundle
   {
-    val provider      = Vec(nColumns, Valid(UInt(log2Ceil(tageNTables).W)))
-    val alt_differs   = Vec(nColumns, Output(Bool()))
-    val provider_u    = Vec(nColumns, Output(UInt(2.W)))
-    val provider_ctr  = Vec(nColumns, Output(UInt(3.W)))
-    val allocate      = Vec(nColumns, Valid(UInt(log2Ceil(tageNTables).W)))
+    val provider      = Vec(numBr, Valid(UInt(log2Ceil(tageNTables).W)))
+    val alt_differs   = Vec(numBr, Output(Bool()))
+    val provider_u    = Vec(numBr, Output(UInt(2.W)))
+    val provider_ctr  = Vec(numBr, Output(UInt(3.W)))
+    val allocate      = Vec(numBr, Valid(UInt(log2Ceil(tageNTables).W)))
   }
 
   val f3_meta = Wire(new TageMeta)
@@ -210,10 +220,10 @@ class InstTage(params: InstTageParams = InstTageParams())(implicit p: Parameters
 
   val cfi_offsets = io.resp_in(0).f1.offsets
   val s1_bankAlignPC = bankAlign(s1_pc)
-  val s1_cfi_pcs     = VecInit((0 until nColumns).map(i => s1_bankAlignPC + cfi_offsets(i)<<instOffsetBits))
+  val s1_cfi_pcs     = VecInit((0 until numBr).map(i => s1_bankAlignPC + (cfi_offsets(i)<<instOffsetBits)))
   val s1_u_bankAlignPC = bankAlign(s1_update.bits.pc)
   val s1_u_offsets   = s1_update.bits.ftb_entry.getOffsetVec
-  val s1_u_cfi_pcs   = VecInit((0 until nColumns).map(i => s1_u_bankAlignPC + s1_u_offsets(i)<<instOffsetBits))
+  val s1_u_cfi_pcs   = VecInit((0 until numBr).map(i => s1_u_bankAlignPC + (s1_u_offsets(i)<<instOffsetBits)))
 
   def inc_u(u: UInt, alt_differs: Bool, mispredict: Bool): UInt = {
     Mux(!alt_differs, u,
@@ -221,30 +231,30 @@ class InstTage(params: InstTageParams = InstTageParams())(implicit p: Parameters
                     Mux(u === 3.U, 3.U, u + 1.U)))
   }
 
-  val tt = params.tableInfo map {
+  val tt = Seq.tabulate(numBr) (w => params.tableInfo map {
     case (n, l, s) => {
-      val t = Module(new InstTageTable(nColumns, n, s, l, params.uBitPeriod))
+      val t = Module(new InstTageTable(1, n, s, l, params.uBitPeriod))
       t.io.f1_req_valid := RegNext(io.f0_valid)
-      t.io.f1_req_pc    := s1_cfi_pcs
+      t.io.f1_req_pc    := s1_cfi_pcs(w)
       t.io.f1_req_ghist := io.f1_ghist
       (t, t.mems)
     }
   }
-  val tables = tt.map(_._1)
-  val mems = tt.map(_._2).flatten
+  )
+  // val mems = tt.map(_._2).flatten
+  val mems = Nil
 
-  val f3_resps = VecInit(tables.map(_.io.f3_resp))
 
 
   val s1_update_meta = s1_update.bits.meta.asTypeOf(new TageMeta)
 
-  val s1_update_mask  = WireInit((0.U).asTypeOf(Vec(tageNTables, Vec(nColumns, Bool()))))
-  val s1_update_u_mask  = WireInit((0.U).asTypeOf(Vec(tageNTables, Vec(nColumns, UInt(1.W)))))
+  val s1_update_mask  = WireInit((0.U).asTypeOf(Vec(tageNTables, Vec(numBr, Bool()))))
+  val s1_update_u_mask  = WireInit((0.U).asTypeOf(Vec(tageNTables, Vec(numBr, UInt(1.W)))))
 
-  val s1_update_taken   = Wire(Vec(tageNTables, Vec(nColumns, Bool())))
-  val s1_update_old_ctr = Wire(Vec(tageNTables, Vec(nColumns, UInt(3.W))))
-  val s1_update_alloc   = Wire(Vec(tageNTables, Vec(nColumns, Bool())))
-  val s1_update_u       = Wire(Vec(tageNTables, Vec(nColumns, UInt(2.W))))
+  val s1_update_taken   = Wire(Vec(tageNTables, Vec(numBr, Bool())))
+  val s1_update_old_ctr = Wire(Vec(tageNTables, Vec(numBr, UInt(3.W))))
+  val s1_update_alloc   = Wire(Vec(tageNTables, Vec(numBr, Bool())))
+  val s1_update_u       = Wire(Vec(tageNTables, Vec(numBr, UInt(2.W))))
 
   val s1_br_update_valids  = VecInit((0 until numBr).map(w => 
     s1_update.bits.is_commit_update &&
@@ -259,7 +269,9 @@ class InstTage(params: InstTageParams = InstTageParams())(implicit p: Parameters
   s1_update_alloc   := DontCare
   s1_update_u       := DontCare
 
-  for (w <- 0 until nColumns) {
+  for (w <- 0 until numBr) {
+    val tables = tt(w).map(_._1)
+    val f3_resps = VecInit(tables.map(_.io.f3_resp))
     var altpred = io.resp_in(0).f3.br_taken_mask(w)
     val final_altpred = WireInit(io.resp_in(0).f3.br_taken_mask(w))
     var provided = false.B
@@ -268,8 +280,8 @@ class InstTage(params: InstTageParams = InstTageParams())(implicit p: Parameters
     io.resp.f3.perfs(w).tage_taken := io.resp.f3.br_taken_mask(w)
 
     for (i <- 0 until tageNTables) {
-      val hit = f3_resps(i)(w).valid
-      val ctr = f3_resps(i)(w).bits.ctr
+      val hit = f3_resps(i).valid
+      val ctr = f3_resps(i).bits.ctr
       when (hit) {
         io.resp.f3.br_taken_mask(w) := Mux(ctr === 3.U || ctr === 4.U, altpred, ctr(2))
         final_altpred       := altpred
@@ -278,18 +290,18 @@ class InstTage(params: InstTageParams = InstTageParams())(implicit p: Parameters
 
       provided = provided || hit
       provider = Mux(hit, i.U, provider)
-      altpred  = Mux(hit, f3_resps(i)(w).bits.ctr(2), altpred)
+      altpred  = Mux(hit, f3_resps(i).bits.ctr(2), altpred)
     }
     f3_meta.provider(w).valid := provided
     f3_meta.provider(w).bits  := provider
     f3_meta.alt_differs(w)    := final_altpred =/= io.resp.f3.br_taken_mask(w)
-    f3_meta.provider_u(w)     := f3_resps(provider)(w).bits.u
-    f3_meta.provider_ctr(w)   := f3_resps(provider)(w).bits.ctr
+    f3_meta.provider_u(w)     := f3_resps(provider).bits.u
+    f3_meta.provider_ctr(w)   := f3_resps(provider).bits.ctr
 
     // Create a mask of tables which did not hit our query, and also contain useless entries
     // and also uses a longer history than the provider
     val allocatable_slots = (
-      VecInit(f3_resps.map(r => !r(w).valid && r(w).bits.u === 0.U)).asUInt &
+      VecInit(f3_resps.map(r => !r.valid && r.bits.u === 0.U)).asUInt &
       ~(MaskLower(UIntToOH(provider)) & Fill(tageNTables, provided))
     )
     val alloc_lfsr = random.LFSR(tageNTables max 2)
@@ -324,7 +336,7 @@ class InstTage(params: InstTageParams = InstTageParams())(implicit p: Parameters
     }
   }
 
-  when (s1_update.bits.mispredSlotIdx < nColumns.U && s1_br_update_valids(s1_update.bits.mispredSlotIdx) && s1_update.bits.cfi_mispredicted) {
+  when (s1_br_update_valids(s1_update.bits.mispredSlotIdx) && s1_update.bits.cfi_mispredicted) {
     // the Vec mispred_mask is of length numBr + 1
     // extract the first numBr elements 
     val idx = s1_update.bits.mispredSlotIdx
@@ -353,18 +365,19 @@ class InstTage(params: InstTageParams = InstTageParams())(implicit p: Parameters
   }
   
 
-  for (i <- 0 until tageNTables) {
-    for (w <- 0 until nColumns) {
-      tables(i).io.update_mask(w)    := RegNext(s1_update_mask(i)(w))
-      tables(i).io.update_taken(w)   := RegNext(s1_update_taken(i)(w))
-      tables(i).io.update_alloc(w)   := RegNext(s1_update_alloc(i)(w))
-      tables(i).io.update_old_ctr(w) := RegNext(s1_update_old_ctr(i)(w))
+  for (w <- 0 until numBr) {
+    val tables = tt(w).map(_._1)
+    for (i <- 0 until tageNTables) {
+      tables(i).io.update_mask    := RegNext(s1_update_mask(i)(w))
+      tables(i).io.update_taken   := RegNext(s1_update_taken(i)(w))
+      tables(i).io.update_alloc   := RegNext(s1_update_alloc(i)(w))
+      tables(i).io.update_old_ctr := RegNext(s1_update_old_ctr(i)(w))
 
-      tables(i).io.update_u_mask(w) := RegNext(s1_update_u_mask(i)(w))
-      tables(i).io.update_u(w)      := RegNext(s1_update_u(i)(w))
-      tables(i).io.update_pc(w)    := RegNext(s1_u_cfi_pcs(w))
+      tables(i).io.update_u_mask := RegNext(s1_update_u_mask(i)(w))
+      tables(i).io.update_u      := RegNext(s1_update_u(i)(w))
+      tables(i).io.update_pc    := RegNext(s1_u_cfi_pcs(w))
+      tables(i).io.update_hist  := RegNext(s1_update.bits.ghist)
     }
-    tables(i).io.update_hist  := RegNext(s1_update.bits.ghist)
   }
 
 
