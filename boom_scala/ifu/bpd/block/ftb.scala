@@ -480,12 +480,14 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   impl.io.req_pc.valid := s0_valid
   impl.io.req_pc.bits := s0_pc
 
+  when(u_s0_need_extend){
+    ebtb.write(s0_update_idx, u.bits.target)
+  }
+
   // --------------------------------------------------------
   // **** (S1) ****
   // --------------------------------------------------------
 
-  val u_s1_target = RegNext(u.bits.target)
-  val u_s1_need_extend = RegNext(u_s0_need_extend)
   val s1_req_rebtb = ebtb.read(s0_idx, s0_valid)
 
   val s1_ftb_entry = fauftbImpl.io.resp_entry
@@ -532,9 +534,7 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   }
   io.resp.f2.hit := s2_entry.valid
 
-  when(RegNext(u_s1_need_extend)){
-    ebtb.write(RegNext(s1_update_idx), RegNext(u_s1_target))
-  }
+
   // --------------------------------------------------------
   // **** (S3) ****
   // --------------------------------------------------------
