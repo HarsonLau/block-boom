@@ -458,13 +458,6 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
       u_s0_entry_valid_slot_mask(w) &&  
       u.bits.ftb_entry.brValids(w) &&
       !(PriorityEncoder(u.bits.br_taken_mask) < w.U))) // TODO: temporarily disable always taken
-  
-  impl.io.update_pc.valid := u_s0_valid
-  impl.io.update_pc.bits := io.update.bits.pc
-  impl.io.update_entry := io.update.bits.ftb_entry
-  impl.io.update_meta := u_meta
-  impl.io.req_pc.valid := s0_valid
-  impl.io.req_pc.bits := s0_pc
 
   fauftbImpl.io.update_pc.valid := u.valid
   fauftbImpl.io.update_pc.bits := io.update.bits.pc
@@ -476,6 +469,16 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   fauftbImpl.io.br_update_mask := u_s0_br_update_valids
   fauftbImpl.io.req_pc.valid := s0_valid
   fauftbImpl.io.req_pc.bits := s0_pc
+
+  val evict_valid = fauftbImpl.io.evict_entry.valid
+  val evicted_entry = fauftbImpl.io.evict_entry.bits
+  val evicted_pc = fauftbImpl.io.evict_tag << instOffsetBits
+  impl.io.update_pc.valid := evict_valid
+  impl.io.update_pc.bits := evicted_pc
+  impl.io.update_entry := evicted_entry
+  impl.io.update_meta := DontCare
+  impl.io.req_pc.valid := s0_valid
+  impl.io.req_pc.bits := s0_pc
 
   // --------------------------------------------------------
   // **** (S1) ****
