@@ -46,7 +46,7 @@ class InstTageTable(val nColumns: Int, val nRows: Int, val tagSz: Int, val histL
   })
   io.f3_resp := DontCare
 
-  val nPartition = 4
+  val nPartition = if(nRows > 256) 4 else 1
 
   def compute_folded_hist(hist: UInt, l: Int) = {
     val nChunks = (histLength + l - 1) / l
@@ -193,6 +193,12 @@ case class InstTageParams(
                                               (  256 * 8,      16,     8),
                                               (  128 * 8,      32,     9),
                                               (  128 * 8,      64,     9)),
+  tableInfo1:Seq[Tuple3[Int, Int, Int]] = Seq((  128 * 1,       2,     7),
+                                              (  128 * 1,       4,     7),
+                                              (  256 * 1,       8,     8),
+                                              (  256 * 1,      16,     8),
+                                              (  128 * 1,      32,     9),
+                                              (  128 * 1,      64,     9)),
   uBitPeriod: Int = 2048
 )
 
@@ -231,7 +237,9 @@ class InstTage(params: InstTageParams = InstTageParams())(implicit p: Parameters
                     Mux(u === 3.U, 3.U, u + 1.U)))
   }
 
-  val tt = Seq.tabulate(numBr) (w => params.tableInfo map {
+  val tt = Seq.tabulate(numBr) (w => 
+    if (w==0)
+    params.tableInfo map {
     case (n, l, s) => {
       val t = Module(new InstTageTable(1, n, s, l, params.uBitPeriod))
       t.io.f1_req_valid := RegNext(io.f0_valid)
@@ -240,6 +248,16 @@ class InstTage(params: InstTageParams = InstTageParams())(implicit p: Parameters
       (t, t.mems)
     }
   }
+    else 
+      params.tableInfo1 map {
+      case (n, l, s) => {
+        val t = Module(new InstTageTable(1, n, s, l, params.uBitPeriod))
+        t.io.f1_req_valid := RegNext(io.f0_valid)
+        t.io.f1_req_pc    := s1_cfi_pcs(w)
+        t.io.f1_req_ghist := io.f1_ghist
+        (t, t.mems)
+      }
+    }
   )
   // val mems = tt.map(_._2).flatten
   val mems = Nil
