@@ -258,6 +258,7 @@ class InstTage(params: InstTageParams = InstTageParams())(implicit p: Parameters
 
   val s1_br_update_valids  = VecInit((0 until numBr).map(w => 
     s1_update.bits.is_commit_update &&
+    // (!s1_update.bits.new_br_insert_pos.valid || s1_update.bits.new_br_insert_pos.bits > w.U) &&
     s1_update.bits.ftb_entry.valid &&
     s1_update.bits.ftb_entry.brValids(w) &&
     s1_update.valid &&
