@@ -431,6 +431,8 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
 
   val impl = Module(new FTBImpl())
 
+  val fauftbImpl = Module(new FauFTBImpl)
+
   val ebtb     = SyncReadMem(extendedNSets, UInt(vaddrBitsExtended.W))
 
   val mems = (((0 until nWays) map ({w:Int => Seq(
@@ -446,6 +448,17 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   val u_s0_commit_valid = u.valid && u.bits.is_commit_update && u.bits.ftb_entry.valid && u.bits.ftb_entry.hasValidSlot
   val u_s0_need_extend = u_s0_commit_valid && u.bits.ftb_entry.needExtend
 
+  val u_s0_entry_valid_slot_mask = u.bits.ftb_entry.brValids
+  val u_s0_br_update_valids =
+    VecInit((0 until numBr).map(w =>
+      u.valid &&
+      // !u.bits.is_btb_mispredict_update &&
+      u.bits.is_commit_update &&
+      u.bits.ftb_entry.valid &&
+      u_s0_entry_valid_slot_mask(w) &&  
+      u.bits.ftb_entry.brValids(w) &&
+      !(PriorityEncoder(u.bits.br_taken_mask) < w.U))) // TODO: temporarily disable always taken
+  
   impl.io.update_pc.valid := u_s0_valid
   impl.io.update_pc.bits := io.update.bits.pc
   impl.io.update_entry := io.update.bits.ftb_entry
@@ -453,17 +466,56 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   impl.io.req_pc.valid := s0_valid
   impl.io.req_pc.bits := s0_pc
 
+  fauftbImpl.io.update_pc.valid := u.valid
+  fauftbImpl.io.update_pc.bits := io.update.bits.pc
+  fauftbImpl.io.update_entry := io.update.bits.ftb_entry
+  fauftbImpl.io.update_meta := io.update.bits.meta.asTypeOf(new FTBMeta)
+  fauftbImpl.io.is_commit_update := io.update.bits.is_commit_update
+  fauftbImpl.io.is_btb_mispredict_update := io.update.bits.is_btb_mispredict_update
+  fauftbImpl.io.br_taken_mask := io.update.bits.br_taken_mask
+  fauftbImpl.io.br_update_mask := u_s0_br_update_valids
+  fauftbImpl.io.req_pc.valid := s0_valid
+  fauftbImpl.io.req_pc.bits := s0_pc
+
+  // --------------------------------------------------------
+  // **** (S1) ****
+  // --------------------------------------------------------
+
   val u_s1_target = RegNext(u.bits.target)
   val u_s1_need_extend = RegNext(u_s0_need_extend)
   val s1_req_rebtb = ebtb.read(s0_idx, s0_valid)
 
+  val s1_ftb_entry = fauftbImpl.io.resp_entry
+
+  val empty_pred = Wire(new BlockPrediction)
+  empty_pred.makeDefault(s1_pc)
+  empty_pred.perfs := DontCare
+  val hit_pred = Wire(new BlockPrediction)
+  hit_pred.fromFtbEntry(s1_ftb_entry, s1_pc)
+  hit_pred.perfs := DontCare
+  hit_pred.br_taken_mask := fauftbImpl.io.resp_br_taken
+  hit_pred.hit := s1_ftb_entry.valid
+
+  io.resp.f1 := Mux(s1_ftb_entry.valid, hit_pred, empty_pred)
+  io.resp.f1.hit := s1_ftb_entry.valid
+  for ( i <- 0 until numBr){
+    io.resp.f1.perfs(i).fauftb_hit := s1_ftb_entry.valid
+    io.resp.f1.perfs(i).fauftb_taken := fauftbImpl.io.resp_br_taken(i)
+
+    io.resp.f1.perfs(i).ftb_entry_hit := false.B
+    io.resp.f1.perfs(i).ftb_slot_hit  := false.B
+    io.resp.f1.perfs(i).bim_taken := false.B
+
+    io.resp.f1.perfs(i).tage_hit := false.B
+    io.resp.f1.perfs(i).tage_taken := false.B
+  }
   // --------------------------------------------------------
   // **** (S2) ****
   // --------------------------------------------------------
 
-  val s2_entry = impl.io.resp
+  val s2_entry = Mux(RegNext(s1_ftb_entry.valid), RegNext(s1_ftb_entry), impl.io.resp)
 
-  io.resp.f2 := io.resp_in(0).f2
+  io.resp.f2 := RegNext(io.resp.f1)
   io.resp.f2.jalr_target.bits := Mux(RegNext(s1_req_rebtb)=/=0.U, RegNext(s1_req_rebtb), nextFetch(s2_pc))
   when(s2_entry.valid) {
     io.resp.f2.fromFtbEntry(s2_entry, s2_pc)
@@ -486,5 +538,5 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   io.resp.f3 := RegNext(io.resp.f2)
 
   io.resp.f3_meta := RegNext(impl.io.meta.asUInt)
-  io.resp.last_stage_entry := Mux(RegNext(s2_entry.valid), RegNext(s2_entry), io.resp_in(0).last_stage_entry)
+  io.resp.last_stage_entry := RegNext(s2_entry)
 }
