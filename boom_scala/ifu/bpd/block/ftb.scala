@@ -521,15 +521,18 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   val s2_entry = Mux(RegNext(s1_ftb_entry.valid), RegNext(s1_ftb_entry), impl.io.resp)
 
   io.resp.f2 := RegNext(io.resp.f1)
+  for (i <- 0 until numBr) {
+    when(io.resp_in(0).f2.br_taken_mask(i) || (s2_entry.valid && s2_entry.always_taken(i))) {
+      io.resp.f2.br_taken_mask(i) := true.B
+    }
+  }
+  io.resp.f2.br_taken_mask := io.resp_in(0).f2.br_taken_mask
   io.resp.f2.jalr_target.bits := Mux(RegNext(s1_req_rebtb)=/=0.U, RegNext(s1_req_rebtb), nextFetch(s2_pc))
   when(s2_entry.valid) {
     io.resp.f2.fromFtbEntry(s2_entry, s2_pc)
     io.resp.f2.jalr_target.valid := s2_entry.needExtend
     for (i <- 0 until numBr) {
       io.resp.f2.perfs(i).ftb_entry_hit := true.B
-      when(s2_entry.always_taken(i)) {
-        io.resp.f2.br_taken_mask(i) := true.B
-      }
     }
   }
   io.resp.f2.hit := s2_entry.valid
