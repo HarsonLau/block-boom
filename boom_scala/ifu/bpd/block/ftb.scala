@@ -547,7 +547,10 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
 
   io.resp.f2 := RegNext(io.resp.f1)
   for (i <- 0 until numBr) {
-    when(io.resp_in(0).f2.br_taken_mask(i) || (s2_entry.valid && s2_entry.always_taken(i))) {
+    when(RegNext(s1_ftb_entry.valid)){
+      io.resp.f2.br_taken_mask(i) := RegNext(fauftbImpl.io.resp_br_taken(i))
+    }
+    .elsewhen(io.resp_in(0).f2.br_taken_mask(i) || (s2_entry.valid && s2_entry.always_taken(i))) {
       io.resp.f2.br_taken_mask(i) := true.B
     }
   }
