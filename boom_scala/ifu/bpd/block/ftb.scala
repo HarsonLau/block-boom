@@ -19,6 +19,7 @@ trait FTBParams extends HasBoomFTBParameters {
   val numSets    = numEntries/numWays // 256
   val tagSize    = 20
   val extendedNSets = 128
+  val nWrBypassEntries = 4
 
 
 
@@ -318,6 +319,11 @@ class FTBImpl(implicit p: Parameters) extends BoomModule()(p) with FTBParams {
   val tag = Seq.fill(nWays) {SyncReadMem(nSets, UInt(tagSize.W))}
   val ftb = Seq.fill(nWays) {SyncReadMem(nSets, new FTBEntry)}
 
+  val wrbypass_tags    = Reg(Vec(nWrBypassEntries, UInt(tagSize.W)))
+  val wrbypass_idxs    = Reg(Vec(nWrBypassEntries, UInt(log2Ceil(nSets).W)))
+  val wrbypass         = Reg(Vec(nWrBypassEntries, new FTBEntry))
+  val wrbypass_enq_idx = RegInit(0.U(log2Ceil(nWrBypassEntries).W))
+
   // --------------------------------------------------------
   // **** (S0) ****
   // --------------------------------------------------------
@@ -331,6 +337,24 @@ class FTBImpl(implicit p: Parameters) extends BoomModule()(p) with FTBParams {
   val u_s0_ftb_entry = io.update_entry
   val u_s0_valid = io.update_pc.valid
   val u_s0_meta  = io.update_meta
+
+  val s0_wrbypass_hits = VecInit((0 until nWrBypassEntries) map { i =>
+    !doing_reset &&
+    wrbypass_idxs(i) === r_s0_idx &&
+    wrbypass_tags(i) === s0_tag &&
+    wrbypass(i).valid
+  })
+  val s0_wrbypass_hit = s0_wrbypass_hits.reduce(_||_)
+  val s0_wrbypass_hit_idx = PriorityEncoder(s0_wrbypass_hits)
+  val s0_wrbypass_hit_entry = wrbypass(s0_wrbypass_hit_idx)
+
+  when(io.update_pc.valid) {
+    val idx = wrbypass_enq_idx
+    wrbypass_tags(idx) := u_s0_tag
+    wrbypass_idxs(idx) := u_s0_idx
+    wrbypass(idx) := u_s0_ftb_entry
+    wrbypass_enq_idx := Mux(wrbypass_enq_idx === (nWrBypassEntries-1).U, 0.U, wrbypass_enq_idx + 1.U)
+  }
 
   // --------------------------------------------------------
   // **** (S1) ****
@@ -351,7 +375,7 @@ class FTBImpl(implicit p: Parameters) extends BoomModule()(p) with FTBParams {
   val s1_hit = s1_hit_ohs.reduce(_||_)
   XSDebug(PopCount(s1_hit_ohs) > 1.U, p"PC 0x${Hexadecimal(io.req_pc.bits)} has ${PopCount(s1_hit_ohs)} hits\n")
   val s1_hit_way = PriorityEncoder(s1_hit_ohs)
-  val s1_ftb_entry = Mux(s1_hit, s1_req_rftb(s1_hit_way), 0.U.asTypeOf(new FTBEntry))
+  val s1_ftb_entry = Mux(RegNext(s0_wrbypass_hit), RegNext(s0_wrbypass_hit_entry), Mux(s1_hit, s1_req_rftb(s1_hit_way), 0.U.asTypeOf(new FTBEntry)))
 
   io.resp := RegNext(s1_ftb_entry)
   io.meta := RegNext(FTBMeta(s1_hit_way, s1_hit))
@@ -438,6 +462,7 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   val mems = (((0 until nWays) map ({w:Int => Seq(
     (f"ftb_tag_way$w", nSets, tagSize),
     (f"ftb_data_way$w", nSets, ftbEntrySz))})).flatten++ Seq(("ebtb", extendedNSets, vaddrBitsExtended)))
+
 
   // --------------------------------------------------------
   // **** (S0) ****
@@ -526,7 +551,6 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
       io.resp.f2.br_taken_mask(i) := true.B
     }
   }
-  io.resp.f2.br_taken_mask := io.resp_in(0).f2.br_taken_mask
   io.resp.f2.jalr_target.bits := Mux(RegNext(s1_req_rebtb)=/=0.U, RegNext(s1_req_rebtb), nextFetch(s2_pc))
   when(s2_entry.valid) {
     io.resp.f2.fromFtbEntry(s2_entry, s2_pc)
