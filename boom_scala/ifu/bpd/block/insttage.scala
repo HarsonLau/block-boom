@@ -188,13 +188,13 @@ class InstTageTable(val nColumns: Int, val nRows: Int, val tagSz: Int, val histL
 case class InstTageParams(
   //                                           nSets, histLen, tagSz
   tableInfo: Seq[Tuple3[Int, Int, Int]] = Seq((  128 * 8,       2,     7),
-                                              (  128 * 8,       4,     7),
+                                              // (  128 * 8,       4,     7),
                                               (  256 * 8,       8,     8),
                                               (  256 * 8,      16,     8),
                                               (  128 * 8,      32,     9),
                                               (  128 * 8,      64,     9)),
   tableInfo1:Seq[Tuple3[Int, Int, Int]] = Seq((  128 * 1,       2,     7),
-                                              (  128 * 1,       4,     7),
+                                              // (  128 * 1,       4,     7),
                                               (  256 * 1,       8,     8),
                                               (  256 * 1,      16,     8),
                                               (  128 * 1,      32,     9),
