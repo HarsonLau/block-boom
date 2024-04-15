@@ -169,7 +169,12 @@ class FauFTBImpl(implicit p: Parameters) extends BoomModule()(p) with FauFTBPara
     when (u_s1_ways_write_valid(w)) {
       for (br <- 0 until numBr) {
         when (u_s1_br_update_valids(br)) {
-          ctrs(w)(br) := satUpdate(ctrs(w)(br), 2, u_s1_br_takens(br))
+          when(u_s1_hit){
+            ctrs(w)(br) := satUpdate(ctrs(w)(br), 2, u_s1_br_takens(br))
+          }
+          .otherwise {
+            ctrs(w)(br) := Mux(u_s1_br_takens(br), 2.U, 1.U)
+          }
         }
       }
     }
