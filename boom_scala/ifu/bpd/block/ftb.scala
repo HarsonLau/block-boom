@@ -441,7 +441,8 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
 
   val u_s1_write_way = Mux(u_s1_meta.hit,
     u_s1_meta.writeWay,
-    Mux(u_s1_hit, u_s1_hit_way, alloc_way)
+    // Mux(u_s1_hit, u_s1_hit_way, alloc_way)
+    alloc_way
    )
 
 
