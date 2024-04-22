@@ -19,6 +19,7 @@ trait FTBParams extends HasBoomFTBParameters {
   val numSets    = numEntries/numWays // 256
   val tagSize    = 20
   val extendedNSets = 128
+  val enableExtendedSet = false
 
 
 
@@ -373,7 +374,7 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   io.resp.f1.jalr_target.bits := Mux(s1_req_rebtb=/=0.U, s1_req_rebtb, nextFetch(s1_pc))
   when(s1_hit && !s1_hit_fallthrough_error) {
     io.resp.f1.fromFtbEntry(s1_ftb_entry, s1_pc)
-    io.resp.f1.jalr_target.valid := s1_ftb_entry.needExtend
+    io.resp.f1.jalr_target.valid := s1_ftb_entry.needExtend && enableExtendedSet.B
     for (i <- 0 until numBr) {
       io.resp.f1.perfs(i).ftb_entry_hit := true.B
       when(s1_ftb_entry.always_taken(i)) {
@@ -461,7 +462,7 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   io.resp.f2.jalr_target.bits := Mux(RegNext(s1_req_rebtb)=/=0.U, RegNext(s1_req_rebtb), nextFetch(s2_pc))
   when(RegNext(s1_hit && !s1_hit_fallthrough_error)) {
     io.resp.f2.fromFtbEntry(RegNext(s1_ftb_entry), RegNext(s1_pc))
-    io.resp.f2.jalr_target.valid := RegNext(s1_ftb_entry.needExtend)
+    io.resp.f2.jalr_target.valid := RegNext(s1_ftb_entry.needExtend && enableExtendedSet.B)
     for (i <- 0 until numBr) {
       io.resp.f2.perfs(i).ftb_entry_hit := true.B
       when(RegNext(s1_ftb_entry.always_taken(i))) {
@@ -498,7 +499,7 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   io.resp.f3 := RegNext(io.resp.f2)
   when(RegNext(RegNext(s1_hit && !s1_hit_fallthrough_error))) {
     io.resp.f3.fromFtbEntry(RegNext(RegNext(s1_ftb_entry)), RegNext(RegNext(s1_pc)))
-    io.resp.f3.jalr_target.valid := RegNext(RegNext(s1_ftb_entry.needExtend))
+    io.resp.f3.jalr_target.valid := RegNext(RegNext(s1_ftb_entry.needExtend && enableExtendedSet.B))
     for(i <- 0 until numBr) {
       io.resp.f3.perfs(i).ftb_entry_hit := true.B
       when(RegNext(RegNext(s1_ftb_entry.always_taken(i))) && RegNext(RegNext(s1_ftb_entry.validSlots(i)))) {
