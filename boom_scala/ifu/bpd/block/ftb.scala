@@ -19,7 +19,7 @@ trait FTBParams extends HasBoomFTBParameters {
   val numSets    = numEntries/numWays // 256
   val tagSize    = 20
   val extendedNSets = 128
-  val enableExtendedSet = false
+  val enableExtendedSet = true
   val enableMissMerge = true
   val enableMRUReplacement = false
   val enablePLRUReplacement = true
@@ -321,7 +321,8 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
 
   val tag = Seq.fill(nWays) {SyncReadMem(nSets, UInt(tagSize.W))}
   val ftb = Seq.fill(nWays) {SyncReadMem(nSets, new FTBEntry)}
-
+  val eidx = Seq.fill(nWays) {SyncReadMem(nSets, UInt(log2Ceil(extendedNSets).W))}
+  val ebtb_widx = RegInit(0.U(log2Ceil(extendedNSets).W))
 
   val ebtb     = SyncReadMem(extendedNSets, UInt(vaddrBitsExtended.W))
   // val replacer = new SetAssocLRU(numSets, numWays, "plru")
@@ -352,8 +353,9 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   // --- Predict Logic ---
   val s1_req_rftb = VecInit(ftb.map(_.read(r_s0_idx, s0_valid)).map(_.asTypeOf(new FTBEntry)))
   val s1_req_rtag = VecInit(tag.map(_.read(r_s0_idx, s0_valid)))
+  val s1_req_reidx = VecInit(eidx.map(_.read(r_s0_idx, s0_valid)))
   val s1_req_ridx = RegNext(r_s0_idx)
-  val s1_req_rebtb = ebtb.read(s0_idx, s0_valid)
+  // val s1_req_rebtb = ebtb.read(s0_idx, s0_valid)
   val s1_req_tag = RegNext(s0_tag)
 
   val s1_hit_ohs = VecInit( (0 until nWays) map { i =>
@@ -368,6 +370,7 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   XSDebug(PopCount(s1_hit_ohs) > 1.U, p"PC 0x${Hexadecimal(s1_pc)} has ${PopCount(s1_hit_ohs)} hits\n")
   val s1_hit_way = PriorityEncoder(s1_hit_ohs)
   val s1_ftb_entry = Mux(s1_hit, s1_req_rftb(s1_hit_way), 0.U.asTypeOf(new FTBEntry))
+  val s1_hit_eidx  = Mux(s1_hit, s1_req_reidx(s1_hit_way), 0.U)
   val s1_hit_fallthrough_error = false.B
 
   s1_meta.hit := s1_hit && !s1_hit_fallthrough_error
@@ -375,7 +378,7 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
 
   // Deliever the prediction in F1 Stage
   io.resp.f1 := io.resp_in(0).f1
-  io.resp.f1.jalr_target.bits := Mux(s1_req_rebtb=/=0.U, s1_req_rebtb, nextFetch(s1_pc))
+  // io.resp.f1.jalr_target.bits := Mux(s1_req_rebtb=/=0.U, s1_req_rebtb, nextFetch(s1_pc))
   when(s1_hit && !s1_hit_fallthrough_error) {
     io.resp.f1.fromFtbEntry(s1_ftb_entry, s1_pc)
     io.resp.f1.jalr_target.valid := s1_ftb_entry.needExtend && enableExtendedSet.B
@@ -505,8 +508,10 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   // **** (S2) ****
   // --------------------------------------------------------
 
+  val s2_jalr_target = ebtb.read(s1_hit_eidx)
+
   io.resp.f2 := RegNext(io.resp.f1)
-  io.resp.f2.jalr_target.bits := Mux(RegNext(s1_req_rebtb)=/=0.U, RegNext(s1_req_rebtb), nextFetch(s2_pc))
+  io.resp.f2.jalr_target.bits := Mux(s2_jalr_target =/= 0.U, s2_jalr_target, nextFetch(s2_pc))
   when(RegNext(s1_hit && !s1_hit_fallthrough_error)) {
     io.resp.f2.fromFtbEntry(RegNext(s1_ftb_entry), RegNext(s1_pc))
     io.resp.f2.jalr_target.valid := RegNext(s1_ftb_entry.needExtend && enableExtendedSet.B)
@@ -530,14 +535,15 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
         Mux(doing_reset, reset_idx, RegNext(u_s1_idx)),
         Mux(doing_reset, 0.U.asTypeOf(UInt(tagSize.W)), RegNext(u_s1_tag))
       )
+      eidx(w).write(
+        Mux(doing_reset, reset_idx, RegNext(u_s1_idx)),
+        Mux(doing_reset, 0.U.asTypeOf(UInt(log2Ceil(extendedNSets).W)), ebtb_widx)
+      )
     }
   }
   when(RegNext(u_s1_need_extend)){
-    if(enableFTBExtendSetInsertPrint){
-      val cond = true
-      XSDebug(cond.B, p"Insert for PC 0x${Hexadecimal(RegNext(u_s1_pc))} at ${RegNext(s1_update_idx)} value 0x${Hexadecimal(RegNext(u_s1_target))}\n")
-    }
-    ebtb.write(RegNext(s1_update_idx), RegNext(u_s1_target))
+    ebtb.write(ebtb_widx, RegNext(u_s1_target))
+    ebtb_widx := WrapInc(ebtb_widx, extendedNSets)
   }
   // --------------------------------------------------------
   // **** (S3) ****
@@ -564,7 +570,7 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   // --------------------------------------------------------
   if(enableFTBExtendSetPredictPrint){
     val cond = io.resp.f2.jalr_target.valid
-    XSDebug(cond, p"Predict for PC 0x${Hexadecimal(RegNext(s1_pc))} at ${s1_idx} value 0x${Hexadecimal(RegNext(s1_req_rebtb))}\n")
+    XSDebug(cond, p"Predict for PC 0x${Hexadecimal(RegNext(s1_pc))} at ${s1_idx} value 0x${Hexadecimal(s2_jalr_target)}\n")
   }
   if(enableFTBPredictPrint){
     val cond = true.B
