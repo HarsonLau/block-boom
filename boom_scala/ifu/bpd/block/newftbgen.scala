@@ -42,7 +42,7 @@ class PredecodeFTBEntryGen(implicit p: Parameters) extends BoomModule with HasBo
       pd.jalTarget),
     isShare=false)
     val recordedTarget = init_entry.tailSlot.getTarget(io.start_addr)
-    init_entry.needExtend := !new_jmp_is_jalr && recordedTarget =/= pd.jalTarget // only care the JAL target for now
+    init_entry.needExtend := false.B
   }
 
   val jmpPft = pd.jmpOffset +& Mux(pd.rvcMask(pd.jmpOffset), 1.U, 2.U) // Pft stands for partial fall through

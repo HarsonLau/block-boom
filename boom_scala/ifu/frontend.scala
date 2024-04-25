@@ -789,7 +789,7 @@ class BoomFrontendModule(outer: BoomFrontend) extends LazyModuleImp(outer)
       val bpd_predicted_jalr_target = n_f3_bpd_resp.io.deq.bits.pred.jalr_target
       // WarnAssert(bpd_predicted_target =/= 0.U, "bpd_predicted_target is 0\n")
       f3_targs (i) := Mux(brsigs.cfi_type === CFI_JALR,
-        Mux(bpd_predicted_jalr_target.valid, bpd_predicted_jalr_target.bits, bpd_predicted_target), // TODO: fixme for unrecorded JALR
+        Mux(bpd_predicted_jalr_target.valid && n_f3_bpd_resp.io.deq.bits.pred.hit_taken_on_jalr, bpd_predicted_jalr_target.bits, bpd_predicted_target), // TODO: fixme for unrecorded JALR
         brsigs.target)
 
       val jalTargetMispredicted = (
