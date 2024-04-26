@@ -20,7 +20,9 @@ trait FTBParams extends HasBoomFTBParameters {
   val tagSize    = 20
   val extendedNSets = 128
   val enableExtendedSet = false
-  val enableMRUReplacement = true
+  val enableMissMerge = true
+  val enableMRUReplacement = false
+  val enablePLRUReplacement = true
 
 
 
@@ -319,7 +321,7 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
 
   val tag = Seq.fill(nWays) {SyncReadMem(nSets, UInt(tagSize.W))}
   val ftb = Seq.fill(nWays) {SyncReadMem(nSets, new FTBEntry)}
-  val mru = Seq.fill(nWays) {SyncReadMem(nSets, Bool())}
+
 
   val ebtb     = SyncReadMem(extendedNSets, UInt(vaddrBitsExtended.W))
   // val replacer = new SetAssocLRU(numSets, numWays, "plru")
@@ -395,7 +397,6 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   // probe
   val u_s1_req_rftb = VecInit(ftb.map(_.read(u_s0_idx, u_s0_valid)).map(_.asTypeOf(new FTBEntry)))
   val u_s1_req_rtag = VecInit(tag.map(_.read(u_s0_idx, u_s0_valid)))
-  val u_s1_req_rmru = VecInit(mru.map(_.read(u_s0_idx, u_s0_valid)))
   val u_s1_req_valids = VecInit((0 until nWays) map { i =>
     val valid = u_s1_req_rftb(i).valid
     valid
@@ -416,10 +417,6 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
 
   val u_s1_need_extend = u_s1_commit_valid && u_s1_ftb_entry.needExtend
 
-  val u_s1_w_mru = VecInit((0 until nWays) map { i =>
-    val w_mru = u_s1_req_rmru(i)
-    w_mru
-  })
 
 
   // --- Replace ---
@@ -428,54 +425,77 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
   // Selection logic:
   //    1. if any entries within the same index is not valid, select it
   //    2. if all entries is valid, use random
-  val alloc_way = if (nWays > 1 && !enableMRUReplacement) {
-    val r_metas = Cat(u_s1_req_rtag.asUInt, u_s1_tag(tagSize - 1, 0))
 
-    val l = log2Ceil(nWays)
-    val nChunks = (r_metas.getWidth + l - 1) / l
-    val chunks = (0 until nChunks) map { i =>
-      r_metas(min((i+1)*l, r_metas.getWidth)-1, i*l)
+  val u_s1_write_way = Wire(UInt(log2Ceil(numWays).W))
+  val write_set = Wire(UInt(log2Ceil(numSets).W))
+  val write_way = Wire(Valid(UInt(log2Ceil(numWays).W)))
+
+  if (enablePLRUReplacement){
+    val logic = new PseudoLRU(nWays)
+    val state_vec = SyncReadMem(nSets, UInt((nWays-1).W))
+    // s0
+    val u_s1_plru_state = state_vec.read(u_s0_idx, u_s0_valid)
+    // s1
+    val replace_way = logic.get_replace_way(u_s1_plru_state)
+    u_s1_write_way := Mux(u_s1_hit, u_s1_hit_way, replace_way)
+    val s1_update_state = logic.get_next_state(u_s1_plru_state,u_s1_write_way)
+    // s2
+    when(RegNext(write_way.valid)){
+      state_vec.write(RegNext(u_s1_idx), RegNext(s1_update_state))
     }
-
-    val valids = u_s1_req_valids.asUInt
-    val valid = valids.andR
-    
-    val w = Wire(UInt(log2Ceil(numWays).W))
-    w := Mux(valid, chunks.reduce(_^_), PriorityEncoder(~valids))
-
-    w
-  } else if (nWays > 1 && enableMRUReplacement) {
-    val r_metas = Cat(u_s1_req_rtag.asUInt, u_s1_tag(tagSize - 1, 0))
-    val l = log2Ceil(nWays)
-    val nChunks = (r_metas.getWidth + l - 1) / l
-    val chunks = (0 until nChunks) map { i =>
-      r_metas(min((i+1)*l, r_metas.getWidth)-1, i*l)
-    }
-    val rand_way = chunks.reduce(_^_)
+  }
+  else if (enableMRUReplacement){
+    val mru = Seq.fill(nWays) {SyncReadMem(nSets, Bool())}
+    val u_s1_req_rmru = VecInit(mru.map(_.read(u_s0_idx, u_s0_valid)))
+    val u_s1_w_mru = VecInit((0 until nWays) map { i =>
+      val w_mru = u_s1_req_rmru(i)
+      w_mru
+    })
 
     val valids = u_s1_req_valids.asUInt
     val valid = valids.andR
 
     val mru_all_1 = u_s1_req_rmru.andR
-    val w = Wire(UInt(log2Ceil(numWays).W))
-    w := Mux(u_s1_hit, u_s1_hit_way, PriorityEncoder(~u_s1_req_rmru.asUInt))
-    w
+    val replace_way = Wire(UInt(log2Ceil(numWays).W))
+    replace_way := Mux(valid, PriorityEncoder(~u_s1_req_rmru), PriorityEncoder(~valids))
+
+    u_s1_write_way := Mux(u_s1_hit, u_s1_hit_way, replace_way)
+    val u_s2_write_way = RegNext(u_s1_write_way)
+    u_s1_w_mru(u_s1_write_way) := true.B
+    when(RegNext(write_way.valid)){
+      val u_s2_w_mru = RegNext(u_s1_w_mru)
+      val u_s2_w_mru_all_1 = u_s2_w_mru.asUInt.andR
+      for ( w <- 0 until nWays){
+        mru(w).write(
+          Mux(doing_reset, reset_idx, RegNext(u_s1_idx)),
+          Mux(doing_reset, false.B, Mux(u_s2_w_mru_all_1, w.U === u_s2_write_way, u_s2_w_mru(w)))
+        )
+      }
+    }
   }
-  else {
-    0.U
+  else{
+    val alloc_way = if (nWays > 1) {
+      val r_metas = Cat(u_s1_req_rtag.asUInt, u_s1_tag(tagSize - 1, 0))
+
+      val l = log2Ceil(nWays)
+      val nChunks = (r_metas.getWidth + l - 1) / l
+      val chunks = (0 until nChunks) map { i =>
+        r_metas(min((i+1)*l, r_metas.getWidth)-1, i*l)
+      }
+
+      val valids = u_s1_req_valids.asUInt
+      val valid = valids.andR
+
+      val w = Wire(UInt(log2Ceil(numWays).W))
+      w := Mux(valid, chunks.reduce(_^_), PriorityEncoder(~valids))
+
+      w
+    }
+    else {
+      0.U
+    }
+    u_s1_write_way := Mux(u_s1_hit && enableMissMerge.B, u_s1_hit_way, alloc_way)
   }
-
-  val u_s1_write_way = Mux(u_s1_meta.hit,
-    u_s1_meta.writeWay,
-    // Mux(u_s1_hit, u_s1_hit_way, alloc_way)
-    alloc_way
-   )
-
-  u_s1_w_mru(u_s1_write_way) := true.B
-
-
-  val write_set = Wire(UInt(log2Ceil(numSets).W))
-  val write_way = Wire(Valid(UInt(log2Ceil(numWays).W)))
 
   write_set := u_s1_idx
   write_way.valid := u_s1_valid
@@ -509,14 +529,6 @@ class FTB(implicit p: Parameters) extends BlockPredictorBank with FTBParams{
       tag(w).write(
         Mux(doing_reset, reset_idx, RegNext(u_s1_idx)),
         Mux(doing_reset, 0.U.asTypeOf(UInt(tagSize.W)), RegNext(u_s1_tag))
-      )
-    }
-    when(RegNext(write_way.valid)){
-      val u_s2_w_mru = RegNext(u_s1_w_mru)
-      val u_s2_w_mru_all_1 = u_s2_w_mru.asUInt.andR
-      mru(w).write(
-        Mux(doing_reset, reset_idx, RegNext(u_s1_idx)),
-        Mux(doing_reset, false.B, Mux(u_s2_w_mru_all_1, w.U === u_s2_write_way, u_s2_w_mru(w)))
       )
     }
   }
