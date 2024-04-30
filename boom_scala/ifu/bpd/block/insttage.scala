@@ -187,18 +187,18 @@ class InstTageTable(val nColumns: Int, val nRows: Int, val tagSz: Int, val histL
 
 case class InstTageParams(
   //                                           nSets, histLen, tagSz
-  tableInfo: Seq[Tuple3[Int, Int, Int]] = Seq((  128 * 4,       2,     7),
+  tableInfo: Seq[Tuple3[Int, Int, Int]] = Seq((  128 * 8,       2,     7),
                                               // (  128 * 8,       4,     7),
-                                              (  256 * 4,       8,     8),
-                                              (  256 * 4,      16,     8),
-                                              (  128 * 4,      32,     9),
-                                              (  128 * 4,      64,     9)),
-  tableInfo1:Seq[Tuple3[Int, Int, Int]] = Seq((  128 /2,       2,     7),
+                                              (  256 * 8,       8,     8),
+                                              (  256 * 8,      16,     8),
+                                              (  128 * 8,      32,     9),
+                                              (  128 * 8,      64,     9)),
+  tableInfo1:Seq[Tuple3[Int, Int, Int]] = Seq((  128,       2,     7),
                                               // (  128 * 1,       4,     7),
-                                              (  256 /2,       8,     8),
-                                              (  256 /2,      16,     8),
-                                              (  128 /2,      32,     9),
-                                              (  128 /2,      64,     9)),
+                                              (  256,       8,     8),
+                                              (  256,      16,     8),
+                                              (  128,      32,     9),
+                                              (  128,      64,     9)),
   uBitPeriod: Int = 2048
 )
 
